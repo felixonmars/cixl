@@ -1,5 +1,8 @@
 * --- task
-* fix test3 valgrind errors
+* profile bench5
+* convert sched loop to use atomic spin lock
+** check snackis
+* check pthread return values
 * --- cxgui
 ** move start-script calls to window show event
 *** add on-show fn

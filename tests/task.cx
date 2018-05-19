@@ -38,7 +38,6 @@
   $out [`foo 2 `baz 1 `bar 0] = check
 )
 
-/*
 (
   let: s1 Sched new;
   let: out [];
@@ -62,4 +61,3 @@
   $s1 run
   $out [`foo 2 `baz 1 `bar 0] = check
 )
-*/

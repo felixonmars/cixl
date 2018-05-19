@@ -16,6 +16,7 @@ struct cx_task *cx_task_init(struct cx_task *t,
   t->prev_bin = t->bin = NULL;
   t->prev_pc = t->pc = -1;
   t->prev_nlibs = t->prev_nscopes = t->prev_ncalls = -1;
+  pthread_cond_init(&t->cond, NULL);
   cx_vec_init(&t->libs, sizeof(struct cx_lib *));
   cx_vec_init(&t->scopes, sizeof(struct cx_scope *));
   cx_vec_init(&t->calls, sizeof(struct cx_call));
@@ -27,11 +28,16 @@ struct cx_task *cx_task_init(struct cx_task *t,
 struct cx_task *cx_task_deinit(struct cx_task *t) {
   cx_box_deinit(&t->action);
 
+  if (t->state != CX_TASK_NEW) {
+    pthread_join(t->thread, NULL);
+  }
+
   if (t->state == CX_TASK_RUN) {
     cx_do_vec(&t->scopes, struct cx_scope *, s) { cx_scope_deref(*s); }
     cx_do_vec(&t->calls, struct cx_call, c) { cx_call_deinit(c); }
   }
   
+  pthread_cond_destroy(&t->cond);
   cx_vec_deinit(&t->libs);
   cx_vec_deinit(&t->scopes);
   cx_vec_deinit(&t->calls);
@@ -83,26 +89,19 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
     t->calls.count = ncalls;
     cx->ncalls -= ncalls;
   }
-  
-  if (swapcontext(&t->context, &t->sched->context) == -1) {
-    cx_error(cx, cx->row, cx->col, "Failed swapping context: %d", errno);
-    return false;
-  }
-  
+
+  pthread_cond_signal(&t->sched->cond);  
+  pthread_cond_wait(&t->cond, &t->sched->mutex);
   return true;
 }
 
-static void on_start(int t_lo, int t_hi,
-		     int scope_lo, int scope_hi) {
-  uintptr_t t_ptr = (uintptr_t)t_lo | ((uintptr_t)t_hi << 32);
-  struct cx_task *t = (struct cx_task *)t_ptr;
-  t->state = CX_TASK_RUN;
-
-  uintptr_t scope_ptr = (uintptr_t)scope_lo | ((uintptr_t)scope_hi << 32);
-  struct cx_scope *scope = (struct cx_scope *)scope_ptr;
+static void *on_start(void *data) {
+  struct cx_scope *scope = data;
   struct cx *cx = scope->cx;
+  struct cx_task *t = cx->task;
+  t->state = CX_TASK_RUN;
+  pthread_mutex_lock(&t->sched->mutex);
   cx_call(&t->action, scope);
-
   cx->task = t->prev_task;
   cx->bin = t->prev_bin;
   cx->pc = t->prev_pc;
@@ -110,6 +109,9 @@ static void on_start(int t_lo, int t_hi,
   while (cx->scopes.count > t->prev_nscopes) { cx_pop_scope(cx, false); }
   while (cx->ncalls > t->prev_ncalls) { cx_test(cx_pop_call(cx)); }
   t->state = CX_TASK_DONE;
+  pthread_cond_signal(&t->sched->cond);
+  pthread_mutex_unlock(&t->sched->mutex);
+  return NULL;
 }
 
 bool cx_task_run(struct cx_task *t, struct cx_scope *scope) {
@@ -126,29 +128,12 @@ bool cx_task_run(struct cx_task *t, struct cx_scope *scope) {
 
   switch (t->state) {
   case CX_TASK_NEW: {
-    if (getcontext(&t->context) == -1) {
-      cx_error(cx, cx->row, cx->col, "Failed getting context: %d", errno);
-      return false;
-    }
-    
-    t->context.uc_stack.ss_sp = t->stack;
-    t->context.uc_stack.ss_size = CX_TASK_STACK_SIZE;
-    t->context.uc_link = &t->sched->context;
-    uintptr_t t_ptr = (uintptr_t)t;
-    uintptr_t scope_ptr = (uintptr_t)scope;
-    
-    makecontext(&t->context,
-		(void (*)(void))on_start,
-		4,
-		(int)t_ptr, (int)(t_ptr >> 32),
-		(int)scope_ptr, (int)(scope_ptr >> 32));
-    
-    if (swapcontext(&t->sched->context, &t->context) == -1) {
-      cx_error(cx, cx->row, cx->col, "Failed swapping context: %d", errno);
-      return false;
-    }
-    
-    return true;
+    pthread_attr_t a;
+    pthread_attr_init(&a);
+    pthread_attr_setstacksize(&a, CX_TASK_STACK_SIZE);
+    pthread_create(&t->thread, &a, on_start, scope);
+    pthread_attr_destroy(&a);
+    break;
   }
   case CX_TASK_RUN: {
     if (t->libs.count) {
@@ -184,17 +169,14 @@ bool cx_task_run(struct cx_task *t, struct cx_scope *scope) {
       cx_vec_clear(&t->calls);
     }
     
-    if (swapcontext(&t->sched->context, &t->context) == -1) {
-      cx_error(cx, cx->row, cx->col, "Failed swapping context: %d", errno);
-      return false;
-    }
-    
-    return true;
+    pthread_cond_signal(&t->cond);
+    break;
   }
   default:
     cx_error(cx, cx->row, cx->col, "Invalid task run state: %d", t->state);
-    break;
+    return false;
   }
 
-  return false;
+  pthread_cond_wait(&t->sched->cond, &t->sched->mutex);
+  return true;
 }

@@ -11,6 +11,8 @@
 
 struct cx_sched *cx_sched_new() {
   struct cx_sched *s = malloc(sizeof(struct cx_sched));
+  pthread_mutex_init(&s->mutex, NULL);
+  pthread_cond_init(&s->cond, NULL);
   cx_ls_init(&s->tasks);
   s->ntasks = 0;
   s->nrefs = 1;
@@ -27,6 +29,9 @@ void cx_sched_deref(struct cx_sched *s) {
   s->nrefs--;
   
   if (!s->nrefs) {
+    pthread_mutex_destroy(&s->mutex);
+    pthread_cond_destroy(&s->cond);
+    
     cx_do_ls(&s->tasks, tq) {
       free(cx_task_deinit(cx_baseof(tq, struct cx_task, queue)));
     }
@@ -41,11 +46,14 @@ void cx_sched_task(struct cx_sched *s, struct cx_box *action) {
   s->ntasks++;
 }
 
-bool cx_sched_next(struct cx_sched *s, struct cx_scope *scope) {
-  if (s->tasks.next == &s->tasks) { return false; }
+bool cx_sched_next(struct cx_sched *s, struct cx_scope *scope, bool lock) {
+  if (lock) { pthread_mutex_lock(&s->mutex); }
+  bool ok = false;
+  
+  if (s->tasks.next == &s->tasks) { goto exit; }
   struct cx_task *t = cx_baseof(s->tasks.next, struct cx_task, queue);
   cx_ls_delete(&t->queue);    
-  if (!cx_task_run(t, scope)) { return false; }
+  if (!cx_task_run(t, scope)) { goto exit; }
   
   if (t->state == CX_TASK_DONE) {
     free(cx_task_deinit(t));
@@ -54,11 +62,16 @@ bool cx_sched_next(struct cx_sched *s, struct cx_scope *scope) {
     cx_ls_prepend(&s->tasks, &t->queue);
   }
 
-  return true;
+  ok = true;
+ exit:
+  if (lock) { pthread_mutex_unlock(&s->mutex); }
+  return ok;
 }
 
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
-  while (cx_sched_next(s, scope));
+  pthread_mutex_lock(&s->mutex);
+  while (cx_sched_next(s, scope, false));
+  pthread_mutex_unlock(&s->mutex);
   return true;
 }
 
@@ -78,7 +91,7 @@ static bool task_next(struct cx_iter *iter,
     return false;
   }
 
-  if (!cx_sched_next(s, scope)) { return false; }
+  if (!cx_sched_next(s, scope, true)) { return false; }
   cx_box_init(out, scope->cx->int_type)->as_int = s->ntasks;
   return true;
 }

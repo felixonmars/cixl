@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
 	  }
 	}
 	
-	fputs(" -lcixl -Bdynamic -ldl -lm", cmd.stream);
+	fputs(" -lcixl -Bdynamic -ldl -lm -lpthread", cmd.stream);
 	for (; argi < argc; argi++) { fprintf(cmd.stream, " %s", argv[argi]); }
 	cx_mfile_close(&cmd);
 
