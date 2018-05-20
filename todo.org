@@ -1,7 +1,4 @@
 * --- task
-* try removing sched.cond
-** use task instead
-* try replacing cond/mutex with sem
 * profile bench5
 * check pthread return values
 * --- cxgui
