@@ -1,4 +1,10 @@
 * --- task
+* change chain reaction to post loop in sched
+** replaces ev
+** rename sched.lock to enter
+** add sched.exit
+*** trigger on resched/done
+** wait on exit before posting enter again
 * use stdatomic to read/write task.state
 * use stdatomic to read/write sched.ntasks/ev
 * check pthread/sem return values
