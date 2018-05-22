@@ -1,6 +1,7 @@
 * --- task
-* profile bench5
-* check pthread return values
+* use stdatomic to read/write task.state
+* use stdatomic to read/write sched.ntasks/ev
+* check pthread/sem return values
 * --- cxgui
 ** move start-script calls to window show event
 *** add on-show fn
@@ -54,7 +55,7 @@
 *** change eval to push value
 * replace clone fallback to copy with error
 ** add Clone trait
-* replace varargs with size/array+macro
+* replace varargs with size/array+macro  pthread_attr_setschedpolicy(&attr, SCHED_RR);
 * add [.. 1 2 3] support
 ** splat current stack into literal
 * add support for type params to stack literals<

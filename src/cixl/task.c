@@ -16,7 +16,6 @@ struct cx_task *cx_task_init(struct cx_task *t,
   t->prev_bin = t->bin = NULL;
   t->prev_pc = t->pc = -1;
   t->prev_nlibs = t->prev_nscopes = t->prev_ncalls = -1;
-  pthread_cond_init(&t->cond, NULL);
   cx_vec_init(&t->libs, sizeof(struct cx_lib *));
   cx_vec_init(&t->scopes, sizeof(struct cx_scope *));
   cx_vec_init(&t->calls, sizeof(struct cx_call));
@@ -37,15 +36,63 @@ struct cx_task *cx_task_deinit(struct cx_task *t) {
     cx_do_vec(&t->calls, struct cx_call, c) { cx_call_deinit(c); }
   }
   
-  pthread_cond_destroy(&t->cond);
   cx_vec_deinit(&t->libs);
   cx_vec_deinit(&t->scopes);
   cx_vec_deinit(&t->calls);
   return t;
 }
 
+static void before_run(struct cx_task *t, struct cx *cx) {
+  t->prev_task = cx->task;
+  cx->task = t;
+  t->prev_bin = cx->bin;
+  cx->bin = t->bin;
+  t->prev_pc = cx->pc;
+  cx->pc = t->pc;
+  t->prev_nlibs = cx->libs.count;
+  t->prev_nscopes = cx->scopes.count;
+  t->prev_ncalls = cx->ncalls;
+}
+
+static void before_resume(struct cx_task *t, struct cx *cx) {
+  before_run(t, cx);
+  
+  if (t->libs.count) {
+    cx_vec_grow(&cx->libs, cx->libs.count+t->libs.count);
+    
+    memcpy(cx_vec_end(&cx->libs),
+	   t->libs.items,
+	   sizeof(struct cx_lib *) * t->libs.count);
+    
+    cx->libs.count += t->libs.count;
+    cx->lib = cx_vec_peek(&cx->libs, 0);
+    cx_vec_clear(&t->libs);
+  }
+
+  if (t->scopes.count) {
+    cx_vec_grow(&cx->scopes, cx->scopes.count+t->scopes.count);
+    
+    memcpy(cx_vec_end(&cx->scopes),
+	   t->scopes.items,
+	   sizeof(struct cx_scope *) * t->scopes.count);
+    
+    cx->scopes.count += t->scopes.count;
+    cx->scope = cx_vec_peek(&cx->scopes, 0);
+    cx_vec_clear(&t->scopes);
+  }
+
+  if (t->calls.count) {
+    memcpy(cx->calls+cx->ncalls,
+	   t->calls.items,
+	   sizeof(struct cx_call) * t->calls.count);
+    
+    cx->ncalls += t->calls.count;
+    cx_vec_clear(&t->calls);
+  }
+}
+
 bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
-  cx_test(t->state != CX_TASK_DONE);
+  t->sched->ev++;
   struct cx *cx = scope->cx;
   cx->task = t->prev_task;
   t->bin = cx->bin;
@@ -90,17 +137,24 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
     cx->ncalls -= ncalls;
   }
 
-  pthread_cond_signal(&t->sched->cond);  
-  pthread_cond_wait(&t->cond, &t->sched->mutex);
+  if (t->sched->ntasks > 1) {
+    size_t ev = t->sched->ev;
+    sem_post(&t->sched->lock);
+    while (t->sched->ntasks > 1 && t->sched->ev == ev) { sched_yield(); } 
+    sem_wait(&t->sched->lock);
+  }
+
+  before_resume(t, cx);
   return true;
 }
 
 static void *on_start(void *data) {
-  struct cx_scope *scope = data;
-  struct cx *cx = scope->cx;
-  struct cx_task *t = cx->task;
+  struct cx_task *t = data;
   t->state = CX_TASK_RUN;
-  pthread_mutex_lock(&t->sched->mutex);
+  sem_wait(&t->sched->lock);
+  struct cx *cx = t->sched->cx;
+  struct cx_scope *scope = cx_scope(cx, 0);
+  before_run(t, scope->cx);
   cx_call(&t->action, scope);
   cx->task = t->prev_task;
   cx->bin = t->prev_bin;
@@ -108,75 +162,17 @@ static void *on_start(void *data) {
   while (cx->libs.count > t->prev_nlibs) { cx_pop_lib(cx); }
   while (cx->scopes.count > t->prev_nscopes) { cx_pop_scope(cx, false); }
   while (cx->ncalls > t->prev_ncalls) { cx_test(cx_pop_call(cx)); }
-  t->state = CX_TASK_DONE;
-  pthread_cond_signal(&t->sched->cond);
-  pthread_mutex_unlock(&t->sched->mutex);
+  t->sched->ntasks--;
+  if (t->sched->ntasks) { sem_post(&t->sched->lock); }
   return NULL;
 }
 
-bool cx_task_run(struct cx_task *t, struct cx_scope *scope) {
-  struct cx *cx = scope->cx;
-  t->prev_task = cx->task;
-  cx->task = t;
-  t->prev_bin = cx->bin;
-  cx->bin = t->bin;
-  t->prev_pc = cx->pc;
-  cx->pc = t->pc;
-  t->prev_nlibs = cx->libs.count;
-  t->prev_nscopes = cx->scopes.count;
-  t->prev_ncalls = cx->ncalls;
-
-  switch (t->state) {
-  case CX_TASK_NEW: {
-    pthread_attr_t a;
-    pthread_attr_init(&a);
-    pthread_attr_setstacksize(&a, CX_TASK_STACK_SIZE);
-    pthread_create(&t->thread, &a, on_start, scope);
-    pthread_attr_destroy(&a);
-    break;
-  }
-  case CX_TASK_RUN: {
-    if (t->libs.count) {
-      cx_vec_grow(&cx->libs, cx->libs.count+t->libs.count);
-    
-      memcpy(cx_vec_end(&cx->libs),
-	     t->libs.items,
-	     sizeof(struct cx_lib *) * t->libs.count);
-    
-      cx->libs.count += t->libs.count;
-      cx->lib = cx_vec_peek(&cx->libs, 0);
-      cx_vec_clear(&t->libs);
-    }
-
-    if (t->scopes.count) {
-      cx_vec_grow(&cx->scopes, cx->scopes.count+t->scopes.count);
-    
-      memcpy(cx_vec_end(&cx->scopes),
-	     t->scopes.items,
-	     sizeof(struct cx_scope *) * t->scopes.count);
-    
-      cx->scopes.count += t->scopes.count;
-      cx->scope = cx_vec_peek(&cx->scopes, 0);
-      cx_vec_clear(&t->scopes);
-    }
-
-    if (t->calls.count) {
-      memcpy(cx->calls+cx->ncalls,
-	     t->calls.items,
-	     sizeof(struct cx_call) * t->calls.count);
-    
-      cx->ncalls += t->calls.count;
-      cx_vec_clear(&t->calls);
-    }
-    
-    pthread_cond_signal(&t->cond);
-    break;
-  }
-  default:
-    cx_error(cx, cx->row, cx->col, "Invalid task run state: %d", t->state);
-    return false;
-  }
-
-  pthread_cond_wait(&t->sched->cond, &t->sched->mutex);
+bool cx_task_start(struct cx_task *t) {  
+  pthread_attr_t a;
+  pthread_attr_init(&a);
+  pthread_attr_setstacksize(&a, CX_TASK_STACK_SIZE);
+  pthread_attr_setschedpolicy(&a, SCHED_RR);
+  pthread_create(&t->thread, &a, on_start, t);
+  pthread_attr_destroy(&a);
   return true;
 }

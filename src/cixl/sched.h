@@ -1,7 +1,7 @@
 #ifndef CX_SCHED_H
 #define CX_SCHED_H
 
-#include <pthread.h>
+#include <semaphore.h>
 #include <stdbool.h>
 
 #include "cixl/ls.h"
@@ -13,19 +13,18 @@ struct cx_task;
 struct cx_type;
 
 struct cx_sched {
-  pthread_mutex_t mutex;
-  pthread_cond_t cond;
-  
+  struct cx *cx;  
   struct cx_ls tasks;
+  sem_t lock;
+  size_t ev;
   unsigned int ntasks, nrefs;
 };
 
-struct cx_sched *cx_sched_new();
+struct cx_sched *cx_sched_new(struct cx *cx);
 struct cx_sched *cx_sched_ref(struct cx_sched *s);
 void cx_sched_deref(struct cx_sched *s);
-void cx_sched_task(struct cx_sched *s, struct cx_box *action);
+bool cx_sched_push(struct cx_sched *s, struct cx_box *action);
 bool cx_sched_yield(struct cx_sched *s);
-bool cx_sched_next(struct cx_sched *s, struct cx_scope *scope, bool lock);
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope);
 struct cx_type *cx_init_sched_type(struct cx_lib *lib);
 

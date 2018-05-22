@@ -11,14 +11,13 @@
 struct cx_sched;
 struct cx_scope;
 
-enum cx_task_state {CX_TASK_NEW, CX_TASK_RUN, CX_TASK_DONE};
+enum cx_task_state {CX_TASK_NEW, CX_TASK_RUN};
 
 struct cx_task {
   struct cx_sched *sched;
   struct cx_box action;
   enum cx_task_state state;
   pthread_t thread;
-  pthread_cond_t cond;
   struct cx_task *prev_task;
   ssize_t prev_pc, pc;
   struct cx_bin *prev_bin, *bin;
@@ -33,6 +32,6 @@ struct cx_task *cx_task_init(struct cx_task *t,
 
 struct cx_task *cx_task_deinit(struct cx_task *t);
 bool cx_task_resched(struct cx_task *t, struct cx_scope *scope);
-bool cx_task_run(struct cx_task *t, struct cx_scope *scope);
+bool cx_task_start(struct cx_task *t);
 
 #endif
