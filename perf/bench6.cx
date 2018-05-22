@@ -1,0 +1,7 @@
+use: cx;
+
+define: n 100000;
+let: s Sched new;
+
+#n {$s {resched resched resched} push} times
+{$s run} clock 1000000 / say

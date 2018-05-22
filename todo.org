@@ -1,9 +1,6 @@
 * --- task
-* switch semaphores to mutex + cond vars
-** compare perf
 * use stdatomic to read/write task.state
 * use stdatomic to read/write sched.ntasks/ev
-* commit
 * check pthread/sem return values
 * --- cxgui
 ** move start-script calls to window show event
