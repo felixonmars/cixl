@@ -16,7 +16,7 @@ struct cx_sched *cx_sched_new(struct cx *cx) {
   s->ntasks = 0;
   s->nrefs = 1;
   cx_ls_init(&s->tasks);
-  sem_init(&s->lock, false, 0);
+  sem_init(&s->enter, false, 0);
   return s;
 }
 
@@ -30,7 +30,7 @@ void cx_sched_deref(struct cx_sched *s) {
   s->nrefs--;
   
   if (!s->nrefs) {
-    sem_destroy(&s->lock);
+    sem_destroy(&s->enter);
      
     cx_do_ls(&s->tasks, tq) {
       free(cx_task_deinit(cx_baseof(tq, struct cx_task, queue)));
@@ -49,7 +49,7 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
 }
 
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
-  sem_post(&s->lock);
+  sem_post(&s->enter);
   
   while (s->tasks.next != &s->tasks) {
     struct cx_task *t = cx_baseof(s->tasks.next, struct cx_task, queue);

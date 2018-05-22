@@ -133,13 +133,13 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
 
   if (t->sched->ntasks > 1) {
     size_t nrescheds = t->sched->nrescheds;
-    sem_post(&t->sched->lock);
+    sem_post(&t->sched->enter);
 
     while (t->sched->ntasks > 1 && t->sched->nrescheds == nrescheds) {
       sched_yield();
     }
     
-    sem_wait(&t->sched->lock);
+    sem_wait(&t->sched->enter);
   }
 
   before_resume(t, cx);
@@ -151,7 +151,7 @@ static void *on_start(void *data) {
   t->state = CX_TASK_RUN;
   t->sched->ntasks++;
   
-  sem_wait(&t->sched->lock);
+  sem_wait(&t->sched->enter);
   struct cx *cx = t->sched->cx;
   struct cx_scope *scope = cx_scope(cx, 0);
   before_run(t, scope->cx);
@@ -163,7 +163,7 @@ static void *on_start(void *data) {
   while (cx->scopes.count > t->prev_nscopes) { cx_pop_scope(cx, false); }
   while (cx->ncalls > t->prev_ncalls) { cx_test(cx_pop_call(cx)); }
   t->sched->ntasks--;
-  if (t->sched->ntasks) { sem_post(&t->sched->lock); }
+  if (t->sched->ntasks) { sem_post(&t->sched->enter); }
   return NULL;
 }
 

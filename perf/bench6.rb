@@ -2,7 +2,7 @@ n = 10000
 fs = []
 
 n.times do
-  fs << Fiber.new {}
+  fs << Fiber.new {Fiber.yield}
 end
 
 t1 = Time.now
