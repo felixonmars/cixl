@@ -92,7 +92,7 @@ static void before_resume(struct cx_task *t, struct cx *cx) {
 }
 
 bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
-  t->sched->ev++;
+  t->sched->nrescheds++;
   struct cx *cx = scope->cx;
   cx->task = t->prev_task;
   t->bin = cx->bin;
@@ -138,9 +138,13 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
   }
 
   if (t->sched->ntasks > 1) {
-    size_t ev = t->sched->ev;
+    size_t nrescheds = t->sched->nrescheds;
     sem_post(&t->sched->lock);
-    while (t->sched->ntasks > 1 && t->sched->ev == ev) { sched_yield(); } 
+
+    while (t->sched->ntasks > 1 && t->sched->nrescheds == nrescheds) {
+      sched_yield();
+    }
+    
     sem_wait(&t->sched->lock);
   }
 

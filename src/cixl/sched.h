@@ -16,8 +16,7 @@ struct cx_sched {
   struct cx *cx;  
   struct cx_ls tasks;
   sem_t lock;
-  size_t ev;
-  unsigned int ntasks, nrefs;
+  size_t ntasks, nrescheds, nrefs;
 };
 
 struct cx_sched *cx_sched_new(struct cx *cx);

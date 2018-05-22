@@ -12,7 +12,7 @@
 struct cx_sched *cx_sched_new(struct cx *cx) {
   struct cx_sched *s = malloc(sizeof(struct cx_sched));
   s->cx = cx;
-  s->ev = 0;
+  s->nrescheds = 0;
   s->ntasks = 0;
   s->nrefs = 1;
   cx_ls_init(&s->tasks);
