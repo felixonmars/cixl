@@ -1,12 +1,16 @@
 * --- task
-* change chain reaction to post loop in sched
+* change chain reaction to post/wait in sched loop
 ** replaces ev
 ** rename sched.lock to enter
 ** add sched.exit
 *** trigger on resched/done
 ** wait on exit before posting enter again
+* commit
 * use stdatomic to read/write task.state
 * use stdatomic to read/write sched.ntasks/ev
+* commit
+* switch semaphores to mutex + cond vars
+** compare perf
 * check pthread/sem return values
 * --- cxgui
 ** move start-script calls to window show event
