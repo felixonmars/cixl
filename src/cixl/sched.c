@@ -50,9 +50,8 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
 
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
   sem_post(&s->lock);
-  while (s->ntasks) { sched_yield(); }
   
-  while (s->tasks.next == &s->tasks) {
+  while (s->tasks.next != &s->tasks) {
     struct cx_task *t = cx_baseof(s->tasks.next, struct cx_task, queue);
     cx_ls_delete(&t->queue);
     free(cx_task_deinit(t));
