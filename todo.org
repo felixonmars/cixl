@@ -1,6 +1,16 @@
 * --- task
+* add sched.exit sem
+** signal for each done thread
+** change sched loop to wait for exit while ntasks
+** add done queue
+*** move done tasks
+*** process for each exit.wait
+**** free(deinit())
+** add queue mutex to protect queues
+*** lock in sched_push/done move
+* ---
 * use stdatomic to read/write task.state
-* use stdatomic to read/write sched.ntasks/ev
+* use stdatomic to read/write sched.ntasks/nrescheds
 * check pthread/sem return values
 * --- cxgui
 ** move start-script calls to window show event

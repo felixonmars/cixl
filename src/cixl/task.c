@@ -156,6 +156,7 @@ static void *on_start(void *data) {
   struct cx_scope *scope = cx_scope(cx, 0);
   before_run(t, scope->cx);
   cx_call(&t->action, scope);
+  
   cx->task = t->prev_task;
   cx->bin = t->prev_bin;
   cx->pc = t->prev_pc;
