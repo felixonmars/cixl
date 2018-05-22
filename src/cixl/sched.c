@@ -43,7 +43,6 @@ void cx_sched_deref(struct cx_sched *s) {
 bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
   struct cx_task *t = cx_task_init(malloc(sizeof(struct cx_task)), s, action);
   cx_ls_prepend(&s->tasks, &t->queue);
-  s->ntasks++;
   if (!cx_task_start(t)) { return false; }
   while (t->state == CX_TASK_NEW) { sched_yield(); }
   return true;
@@ -51,14 +50,12 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
 
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
   sem_post(&s->lock);
+  while (s->ntasks) { sched_yield(); }
   
-  while (s->ntasks) {
-    cx_do_ls(&s->tasks, tp) {
-      struct cx_task *t = cx_baseof(tp, struct cx_task, queue);
-      pthread_join(t->thread, NULL);
-      cx_ls_delete(&t->queue);
-      free(cx_task_deinit(t));
-    }
+  while (s->tasks.next == &s->tasks) {
+    struct cx_task *t = cx_baseof(s->tasks.next, struct cx_task, queue);
+    cx_ls_delete(&t->queue);
+    free(cx_task_deinit(t));
   }
 
   return true;

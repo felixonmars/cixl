@@ -1,6 +1,6 @@
 use: cx;
 
-define: n 100000;
+define: n 10000;
 let: s Sched new;
 
 #n {$s {resched resched resched} push} times

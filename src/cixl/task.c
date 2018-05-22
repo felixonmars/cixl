@@ -25,16 +25,10 @@ struct cx_task *cx_task_init(struct cx_task *t,
 }
 
 struct cx_task *cx_task_deinit(struct cx_task *t) {
+  pthread_join(t->thread, NULL);
   cx_box_deinit(&t->action);
-
-  if (t->state != CX_TASK_NEW) {
-    pthread_join(t->thread, NULL);
-  }
-
-  if (t->state == CX_TASK_RUN) {
-    cx_do_vec(&t->scopes, struct cx_scope *, s) { cx_scope_deref(*s); }
-    cx_do_vec(&t->calls, struct cx_call, c) { cx_call_deinit(c); }
-  }
+  cx_do_vec(&t->scopes, struct cx_scope *, s) { cx_scope_deref(*s); }
+  cx_do_vec(&t->calls, struct cx_call, c) { cx_call_deinit(c); }
   
   cx_vec_deinit(&t->libs);
   cx_vec_deinit(&t->scopes);
@@ -155,6 +149,8 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
 static void *on_start(void *data) {
   struct cx_task *t = data;
   t->state = CX_TASK_RUN;
+  t->sched->ntasks++;
+  
   sem_wait(&t->sched->lock);
   struct cx *cx = t->sched->cx;
   struct cx_scope *scope = cx_scope(cx, 0);
