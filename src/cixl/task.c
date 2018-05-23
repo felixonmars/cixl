@@ -140,7 +140,7 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
   if (atomic_load(&t->sched->ntasks) > 1) {
     size_t nrescheds = t->sched->nrescheds;
     
-    if (sem_post(&t->sched->enter) != 0) {
+    if (sem_post(&t->sched->go) != 0) {
       cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
     }
 
@@ -149,7 +149,7 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
       sched_yield();
     }
     
-    if (sem_wait(&t->sched->enter) != 0) {
+    if (sem_wait(&t->sched->go) != 0) {
       cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
     }
   }
@@ -164,7 +164,7 @@ static void *on_start(void *data) {
   atomic_store(&t->state, CX_TASK_RUN);
   atomic_fetch_add(&t->sched->ntasks, 1);
   
-  if (sem_wait(&t->sched->enter) != 0) {
+  if (sem_wait(&t->sched->go) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
     return NULL;
   }
@@ -181,7 +181,7 @@ static void *on_start(void *data) {
   while (cx->ncalls > t->prev_ncalls) { cx_test(cx_pop_call(cx)); }
 
   if (atomic_fetch_sub(&t->sched->ntasks, 1) > 1 &&
-      sem_post(&t->sched->enter) != 0) {
+      sem_post(&t->sched->go) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
   }
   

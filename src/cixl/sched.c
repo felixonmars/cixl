@@ -19,7 +19,7 @@ struct cx_sched *cx_sched_new(struct cx *cx) {
   s->nrefs = 1;
   cx_ls_init(&s->tasks);
 
-  if (sem_init(&s->enter, false, 0) != 0) {
+  if (sem_init(&s->go, false, 0) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed initializing: %d", errno);
   }
 					  
@@ -36,7 +36,7 @@ void cx_sched_deref(struct cx_sched *s) {
   s->nrefs--;
   
   if (!s->nrefs) {
-    if (sem_destroy(&s->enter) != 0) {
+    if (sem_destroy(&s->go) != 0) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying: %d", errno);
     }
      
@@ -57,7 +57,7 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
 }
 
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
-  if (sem_post(&s->enter) != 0) {
+  if (sem_post(&s->go) != 0) {
     cx_error(s->cx, s->cx->row, s->cx->col, "Failed posting: %d", errno);
     return false;
   }
