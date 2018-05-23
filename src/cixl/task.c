@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stdatomic.h>
 #include <string.h>
 
 #include "cixl/cx.h"
@@ -25,7 +26,12 @@ struct cx_task *cx_task_init(struct cx_task *t,
 }
 
 struct cx_task *cx_task_deinit(struct cx_task *t) {
-  pthread_join(t->thread, NULL);
+  struct cx *cx = cx;
+  
+  if (pthread_join(t->thread, NULL) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed joining thread: %d", errno);
+  }
+  
   cx_box_deinit(&t->action);
   cx_do_vec(&t->scopes, struct cx_scope *, s) { cx_scope_deref(*s); }
   cx_do_vec(&t->calls, struct cx_call, c) { cx_call_deinit(c); }
@@ -86,7 +92,7 @@ static void before_resume(struct cx_task *t, struct cx *cx) {
 }
 
 bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
-  t->sched->nrescheds++;
+  atomic_fetch_add(&t->sched->nrescheds, 1);
   struct cx *cx = scope->cx;
   cx->task = t->prev_task;
   t->bin = cx->bin;
@@ -131,15 +137,21 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
     cx->ncalls -= ncalls;
   }
 
-  if (t->sched->ntasks > 1) {
+  if (atomic_load(&t->sched->ntasks) > 1) {
     size_t nrescheds = t->sched->nrescheds;
-    sem_post(&t->sched->enter);
+    
+    if (sem_post(&t->sched->enter) != 0) {
+      cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
+    }
 
-    while (t->sched->ntasks > 1 && t->sched->nrescheds == nrescheds) {
+    while (atomic_load(&t->sched->ntasks) > 1 &&
+	   atomic_load(&t->sched->nrescheds) == nrescheds) {
       sched_yield();
     }
     
-    sem_wait(&t->sched->enter);
+    if (sem_wait(&t->sched->enter) != 0) {
+      cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
+    }
   }
 
   before_resume(t, cx);
@@ -148,23 +160,31 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
 
 static void *on_start(void *data) {
   struct cx_task *t = data;
-  t->state = CX_TASK_RUN;
-  t->sched->ntasks++;
-  
-  sem_wait(&t->sched->enter);
   struct cx *cx = t->sched->cx;
+  atomic_store(&t->state, CX_TASK_RUN);
+  atomic_fetch_add(&t->sched->ntasks, 1);
+  
+  if (sem_wait(&t->sched->enter) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
+    return NULL;
+  }
+  
   struct cx_scope *scope = cx_scope(cx, 0);
   before_run(t, scope->cx);
   cx_call(&t->action, scope);
-  
+
   cx->task = t->prev_task;
   cx->bin = t->prev_bin;
   cx->pc = t->prev_pc;
   while (cx->libs.count > t->prev_nlibs) { cx_pop_lib(cx); }
   while (cx->scopes.count > t->prev_nscopes) { cx_pop_scope(cx, false); }
   while (cx->ncalls > t->prev_ncalls) { cx_test(cx_pop_call(cx)); }
-  t->sched->ntasks--;
-  if (t->sched->ntasks) { sem_post(&t->sched->enter); }
+
+  if (atomic_fetch_sub(&t->sched->ntasks, 1) > 1 &&
+      sem_post(&t->sched->enter) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
+  }
+  
   return NULL;
 }
 
@@ -173,7 +193,13 @@ bool cx_task_start(struct cx_task *t) {
   pthread_attr_init(&a);
   pthread_attr_setstacksize(&a, CX_TASK_STACK_SIZE);
   pthread_attr_setschedpolicy(&a, SCHED_RR);
-  pthread_create(&t->thread, &a, on_start, t);
+  bool ok = pthread_create(&t->thread, &a, on_start, t) == 0;
+
+  if (!ok) {
+    struct cx *cx = t->sched->cx;
+    cx_error(cx, cx->row, cx->col, "Failed creating thread: %d", errno);
+  }
+
   pthread_attr_destroy(&a);
-  return true;
+  return ok;
 }

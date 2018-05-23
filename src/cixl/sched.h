@@ -25,6 +25,7 @@ void cx_sched_deref(struct cx_sched *s);
 bool cx_sched_push(struct cx_sched *s, struct cx_box *action);
 bool cx_sched_yield(struct cx_sched *s);
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope);
+
 struct cx_type *cx_init_sched_type(struct cx_lib *lib);
 
 #endif
