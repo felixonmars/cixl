@@ -180,11 +180,28 @@ static void *on_start(void *data) {
   while (cx->scopes.count > t->prev_nscopes) { cx_pop_scope(cx, false); }
   while (cx->ncalls > t->prev_ncalls) { cx_test(cx_pop_call(cx)); }
 
+  if (pthread_mutex_lock(&t->sched->q_lock) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed locking: %d", errno);
+    return false;
+  }
+
+  cx_ls_delete(&t->q);
+  cx_ls_prepend(&t->sched->done_q, &t->q);
+
+  if (pthread_mutex_unlock(&t->sched->q_lock) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed unlocking: %d", errno);
+    return false;
+  }
+
   if (atomic_fetch_sub(&t->sched->nready, 1) > 1 &&
       sem_post(&t->sched->go) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
+    cx_error(cx, cx->row, cx->col, "Failed posting go: %d", errno);
   }
-  
+
+  if (sem_post(&t->sched->done) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed posting done: %d", errno);
+  }
+
   return NULL;
 }
 

@@ -1,6 +1,7 @@
 #ifndef CX_SCHED_H
 #define CX_SCHED_H
 
+#include <pthread.h>
 #include <semaphore.h>
 #include <stdbool.h>
 
@@ -14,8 +15,9 @@ struct cx_type;
 
 struct cx_sched {
   struct cx *cx;  
-  struct cx_ls ready_q;
-  sem_t go;
+  struct cx_ls ready_q, done_q;
+  pthread_mutex_t q_lock;
+  sem_t go, done;
   size_t nready, nrescheds, nrefs;
 };
 
