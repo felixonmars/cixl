@@ -2,7 +2,7 @@
 #### 2018-05-24
 
 ### Intro
-In a previous [post](https://github.com/basic-gongfu/cixl/blob/master/devlog/minimal_fibers.md), I presented [Cixl](https://github.com/basic-gongfu/cixl)'s strategy for implementing fibers on top of [ucontext](http://pubs.opengroup.org/onlinepubs/7908799/xsh/ucontext.h.html). One of the issues with ucontext is that it does more than needed for a fiber scheduler, another is that the functionality was deprecated a while back. In place of ucontext, the POSIX gods suggest using [pthreads](https://computing.llnl.gov/tutorials/pthreads/) instead. Say what? I was under the impression that the reason we're going through all this trouble with fibers is that they can't be implemented on top of threads without loosing their qualities. But then I realized that I never even heard of anyone trying, a quick web search turned up [npth](https://github.com/gpg/npth) but that's about it; so I set out on a 3 day expedition deep into pthread land, mostly to prove to myself that it couldn't be done. Except; from where I am standing right now, it can. And besides being possible, as well as more portable; it's also 2-3 times faster while supporting all but the most extreme use cases.
+In a previous [post](https://github.com/basic-gongfu/cixl/blob/master/devlog/minimal_fibers.md), I presented [Cixl](https://github.com/basic-gongfu/cixl)'s strategy for implementing fibers on top of [ucontext](http://pubs.opengroup.org/onlinepubs/7908799/xsh/ucontext.h.html). One of the issues with ucontext is that it does more than needed for a fiber scheduler, another is that the functionality was deprecated a while back. In place of ucontext, the POSIX gods suggest using [pthreads](https://computing.llnl.gov/tutorials/pthreads/) instead. Say what? I was under the impression that the reason we're going through all this trouble with fibers is that they can't be implemented on top of threads without loosing their qualities. But then I realized that I never even heard of anyone trying, a quick web search turned up [npth](https://github.com/gpg/npth) but that's about it; so I set out on a 3 day expedition deep into pthread land, mostly to prove to myself that it couldn't be done. Except; from where I am standing right now, it can. And besides being possible, and not deprecated; it's also potentially 2-3 times faster while supporting all but the most extreme use cases.
 
 ### Implementation
 An initial implementation that switched back and forth between scheduler and fibers while preserving sequence and respecting yields ran roughly 10 times slower than ucontext. But just as I was about to declare victory and move on, I realized that I wasn't really taking advantage of the functionality that was offered. Switching pthreads to use round-robin scheduling and having fibers forward the run signal without involving the scheduler loop brought the time down to 2-3 times faster than ucontext. This means that it's potentially running two threads at a time, the scheduler loop and the current fiber.
@@ -121,6 +121,22 @@ static void *on_start(void *data) {
   }
 
   return NULL;
+}
+
+bool cx_task_start(struct cx_task *t) {  
+  pthread_attr_t a;
+  pthread_attr_init(&a);
+  pthread_attr_setstacksize(&a, CX_TASK_STACK_SIZE);
+  pthread_attr_setschedpolicy(&a, SCHED_RR);
+  bool ok = pthread_create(&t->thread, &a, on_start, t) == 0;
+
+  if (!ok) {
+    struct cx *cx = t->sched->cx;
+    cx_error(cx, cx->row, cx->col, "Failed creating thread: %d", errno);
+  }
+
+  pthread_attr_destroy(&a);
+  return ok;
 }
 ```
 
