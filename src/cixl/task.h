@@ -23,7 +23,7 @@ struct cx_task {
   struct cx_bin *prev_bin, *bin;
   ssize_t prev_nlibs, prev_nscopes, prev_ncalls;
   struct cx_vec libs, scopes, calls;
-  struct cx_ls queue;
+  struct cx_ls q;
 };
 
 struct cx_task *cx_task_init(struct cx_task *t,

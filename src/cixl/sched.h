@@ -14,9 +14,9 @@ struct cx_type;
 
 struct cx_sched {
   struct cx *cx;  
-  struct cx_ls tasks;
+  struct cx_ls ready_q;
   sem_t go;
-  size_t ntasks, nrescheds, nrefs;
+  size_t nready, nrescheds, nrefs;
 };
 
 struct cx_sched *cx_sched_new(struct cx *cx);

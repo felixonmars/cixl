@@ -15,9 +15,9 @@ struct cx_sched *cx_sched_new(struct cx *cx) {
   struct cx_sched *s = malloc(sizeof(struct cx_sched));
   s->cx = cx;
   s->nrescheds = 0;
-  s->ntasks = 0;
+  s->nready = 0;
   s->nrefs = 1;
-  cx_ls_init(&s->tasks);
+  cx_ls_init(&s->ready_q);
 
   if (sem_init(&s->go, false, 0) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed initializing: %d", errno);
@@ -40,17 +40,17 @@ void cx_sched_deref(struct cx_sched *s) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying: %d", errno);
     }
      
-    cx_do_ls(&s->tasks, tp) {
-      free(cx_task_deinit(cx_baseof(tp, struct cx_task, queue)));
+    cx_do_ls(&s->ready_q, tp) {
+      free(cx_task_deinit(cx_baseof(tp, struct cx_task, q)));
     }
-    
+
     free(s);
   }
 }
 
 bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
   struct cx_task *t = cx_task_init(malloc(sizeof(struct cx_task)), s, action);
-  cx_ls_prepend(&s->tasks, &t->queue);
+  cx_ls_prepend(&s->ready_q, &t->q);
   if (!cx_task_start(t)) { return false; }
   while (atomic_load(&t->state) == CX_TASK_NEW) { sched_yield(); }
   return true;
@@ -62,9 +62,9 @@ bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
     return false;
   }
   
-  while (atomic_load(&s->ntasks)) {
-    struct cx_task *t = cx_baseof(s->tasks.next, struct cx_task, queue);
-    cx_ls_delete(&t->queue);
+  while (atomic_load(&s->nready)) {
+    struct cx_task *t = cx_baseof(s->ready_q.next, struct cx_task, q);
+    cx_ls_delete(&t->q);
     free(cx_task_deinit(t));
   }
 
