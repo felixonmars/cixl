@@ -14,7 +14,7 @@
 struct cx_sched *cx_sched_new(struct cx *cx) {
   struct cx_sched *s = malloc(sizeof(struct cx_sched));
   s->cx = cx;
-  s->nrescheds = 0;
+  s->nruns = 0;
   s->nready = 0;
   s->nrefs = 1;
   cx_ls_init(&s->ready_q);

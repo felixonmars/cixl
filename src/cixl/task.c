@@ -92,7 +92,6 @@ static void before_resume(struct cx_task *t, struct cx *cx) {
 }
 
 bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
-  atomic_fetch_add(&t->sched->nrescheds, 1);
   struct cx *cx = scope->cx;
   cx->task = t->prev_task;
   t->bin = cx->bin;
@@ -138,14 +137,14 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
   }
 
   if (atomic_load(&t->sched->nready) > 1) {
-    size_t nrescheds = t->sched->nrescheds;
+    size_t prev_nruns = t->sched->nruns;
     
     if (sem_post(&t->sched->go) != 0) {
       cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
     }
 
     while (atomic_load(&t->sched->nready) > 1 &&
-	   atomic_load(&t->sched->nrescheds) == nrescheds) {
+	   atomic_load(&t->sched->nruns) == prev_nruns) {
       sched_yield();
     }
     
@@ -155,6 +154,7 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
   }
 
   before_resume(t, cx);
+  atomic_fetch_add(&t->sched->nruns, 1);
   return true;
 }
 
@@ -171,6 +171,7 @@ static void *on_start(void *data) {
   
   struct cx_scope *scope = cx_scope(cx, 0);
   before_run(t, scope->cx);
+  atomic_fetch_add(&t->sched->nruns, 1);
   cx_call(&t->action, scope);
 
   cx->task = t->prev_task;
