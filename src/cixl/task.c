@@ -210,7 +210,6 @@ bool cx_task_start(struct cx_task *t) {
   pthread_attr_t a;
   pthread_attr_init(&a);
   pthread_attr_setstacksize(&a, CX_TASK_STACK_SIZE);
-  pthread_attr_setschedpolicy(&a, SCHED_RR);
   bool ok = pthread_create(&t->thread, &a, on_start, t) == 0;
 
   if (!ok) {
