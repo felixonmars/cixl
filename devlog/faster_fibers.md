@@ -2,13 +2,14 @@
 #### 2018-05-24
 
 ### Intro
-In a previous [post](https://github.com/basic-gongfu/cixl/blob/master/devlog/minimal_fibers.md), I presented [Cixl](https://github.com/basic-gongfu/cixl)'s strategy for implementing fibers on top of [ucontext](http://pubs.opengroup.org/onlinepubs/7908799/xsh/ucontext.h.html). One of the issues with ucontext is that it does more than needed for a fiber scheduler, another is that the functionality was deprecated a while back. In place of ucontext, the POSIX gods suggest using [pthreads](https://computing.llnl.gov/tutorials/pthreads/) instead. I was under the impression that the reason we're going through all this trouble with fibers is that they can't be implemented on top of preemptive threads without loosing most of their qualities. But then I realized that I never heard of anyone trying, a quick web search turned up [npth](https://github.com/gpg/npth) but that's about it; so I set out on a 3 day expedition into pthread land, mostly to prove to myself that it isn't possible. Except; from where I'm standing right now, it certainly looks like it might be. And besides being possible, and not deprecated; it's also potentially 2-3 times faster while supporting all but the most extreme fiber use cases.
+In a previous [post](https://github.com/basic-gongfu/cixl/blob/master/devlog/minimal_fibers.md), I presented [Cixl](https://github.com/basic-gongfu/cixl)'s strategy for implementing fibers on top of [ucontext](http://pubs.opengroup.org/onlinepubs/7908799/xsh/ucontext.h.html). One of the issues with ucontext is that it does more than needed for a fiber scheduler, another is that the functionality was deprecated a while back. In place of ucontext, the POSIX gods suggest using [pthreads](https://computing.llnl.gov/tutorials/pthreads/) instead. Until recently, I was under the impression that the reason we're going through all this trouble with fibers is that they can't be implemented on top of preemptive threads without loosing most of their qualities. But then I realized that I never really heard of anyone trying, a quick web search turned up [npth](https://github.com/gpg/npth) but that's about it; so I set out on a 3 day expedition into pthread land, mostly to prove to myself that it isn't possible. Except; from where I'm standing right now, it certainly looks like it might be. And besides being possible, and not deprecated; it's also potentially 2-3 times faster while supporting all but the most extreme fiber cases.
 
 ### Implementation
-An initial implementation that switched back and forth between scheduler loop and fibers ran roughly 10 times slower than ucontext. But just as I was about to declare victory and move on, I realized that I would probably be better off reusing the existing scheduler loop than duplicating it. Making fibers responsible for forwarding the run signal without using a scheduler loop brought the time down to 2-3 times faster than ucontext. This means that it's potentially running two threads at a time, the scheduler loop and the current fiber; which means that access to common resources has to be controlled using either locks or atomics.
+An initial implementation that switched back and forth between scheduler loop and fibers ran roughly 10 times slower than ucontext. But just as I was about to declare victory and move on, I realized that I would probably be better off reusing the existing scheduler loop than duplicating it. Making fibers responsible for forwarding the run signal without using a separate loop brought the time down to 2-3 times faster than ucontext. This means that it's potentially running two threads at a time, the scheduler loop and the current fiber; which means that access to common resources has to be controlled using either locks or atomics.
 
 The scheduler is reduced to launching the first and cleaning up finished fibers, it doesn't return until all fibers are joined.
 
+sched.[h](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/sched.h)/[c](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/sched.c)
 ```
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
   if (sem_post(&s->go) != 0) {
@@ -47,7 +48,8 @@ bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
 }
 ```
 
-The scheduler busy-waits for new fibers to start to preserve the specified calling sequence.
+
+To enforce the specified scheduling sequence, the scheduler busy-waits for new fibers to start. A more elaborate option that remains to be explored is putting new fibers on a separate queue and using a semaphore to trigger processing just like for ```done_q```.
 
 ```
 bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
@@ -74,6 +76,7 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
 
 While fibers do little more than change their state before waiting on the ```go``` semaphore.
 
+task.[h](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/task.h)/[c](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/task.c)
 ```
 static void *on_start(void *data) {
   struct cx_task *t = data;
