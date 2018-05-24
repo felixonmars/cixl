@@ -1,12 +1,16 @@
 * copy cont+tests from cixl_ucontext
 ** convert to jump out of thread scope
 ** cont.c
+* implement Sched.call
+** replaces run
+** update examples/tests/perf
 * add sched.new_q/new sem
 ** protect with q_lock
 ** add in push
 ** post sem in on_start before waiting
 ** process like done in loop
 ** compare bench6
+* add Concurrency/Tasks to readme
 * --- cxgui
 ** move start-script calls to window show event
 *** add on-show fn
