@@ -1,3 +1,12 @@
+* try longjmping out of thread scope
+** cont
+** add separate test
+* add sched.new_q/new sem
+** protect with q_lock
+** add in push
+** post sem in on_start before waiting
+** process like done in loop
+** compare bench6
 * --- cxgui
 ** move start-script calls to window show event
 *** add on-show fn
