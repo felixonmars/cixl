@@ -2,7 +2,7 @@
 #### 2018-05-17
 
 ### Intro
-Fibers, or Green Threads, is one of those features that I knew [Cixl](https://github.com/basic-gongfu/cixl) would have to support eventually; but I wanted to wait until the dust settled before deciding on implementation details. Some languages, like Lua for example; expose raw coroutines and leave scheduling as an excercise. While Cixl may eventually support raw coroutines, I still feel like it makes sense to separate concerns and provide fibers and scheduling as first class concepts. The implementation described here is my best attempt at cutting the concepts down to their core within the framework provided by Cixl; it has much in common with Smalltalk's flavor of cooperative concurrency, but comes with the added twist of first class schedulers.
+Fibers, or Green Threads, is one of those features that I knew [Cixl](https://github.com/basic-gongfu/cixl) would have to support eventually; but I wanted to wait until the dust settled before deciding on implementation details. Some languages, like Lua for example; expose raw coroutines and leave scheduling as an excercise. While Cixl may eventually support raw coroutines, I still feel like it makes sense to separate concerns and provide fibers and scheduling as first class concepts since that allows taking them into account when doing io etc. The implementation described here is my best attempt at cutting the concepts down to their core within the framework provided by Cixl; it has much in common with Smalltalk's flavor of cooperative concurrency, but comes with the added twist of first class schedulers.
 
 ### Examples
 The following example demonstrates how to create a scheduler, push some fibers and wait until all are finished:
@@ -30,31 +30,6 @@ $out ', ' join say
 Output:
 ```
 1, 3, 2, 4
-```
-
-Schedulers may alternatively be iterated for more granular control, each iteration triggers one fiber and pushes the number of active fibers on the stack:
-
-```
-let: s Sched new;
-let: out [];
-
-$s {
-  $out `foo push
-  resched
-  $out `bar push
-} push
-
-$s {
-  $out `baz push
-} push
-
-$s {$out ~ push} for
-$out ', ' join say
-```
-
-Output:
-```
-foo, 2, baz, 1, bar, 0
 ```
 
 ### Performance
