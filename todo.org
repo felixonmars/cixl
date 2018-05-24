@@ -1,6 +1,6 @@
-* try longjmping out of thread scope
-** cont
-** add separate test
+* copy cont+tests from cixl_ucontext
+** convert to jump out of thread scope
+** cont.c
 * add sched.new_q/new sem
 ** protect with q_lock
 ** add in push
