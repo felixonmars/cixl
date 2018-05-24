@@ -1,9 +1,6 @@
 * copy cont+tests from cixl_ucontext
 ** convert to jump out of thread scope
 ** cont.c
-* implement Sched.call
-** replaces run
-** update examples/tests/perf
 * add sched.new_q/new sem
 ** protect with q_lock
 ** add in push
