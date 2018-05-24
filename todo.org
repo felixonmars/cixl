@@ -1,8 +1,3 @@
-* add done_queue, queue_lock & done sem
-** rename tasks to ready_queue
-** check done_queue instead of tasks in sched loop
-*** move ntasks decrease to sched loop
-** compare perf
 * --- cxgui
 ** move start-script calls to window show event
 *** add on-show fn
