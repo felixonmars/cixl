@@ -1,10 +1,5 @@
-* add sched.new_q sem
-** protect with q_lock
-** add in push
-** post sem in on_start before waiting
-** process with done_q in loop
-*** rename done sem to loop
-** compare bench6
+* coro
+* cont
 * add Concurrency/Tasks to readme
 * --- cxgui
 ** move start-script calls to window show event

@@ -49,7 +49,7 @@ bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
 ```
 
 
-To enforce the specified scheduling sequence, the scheduler busy-waits for new fibers to start. A more elaborate option that remains to be explored is putting new fibers on a separate queue and using a semaphore to trigger processing just like for ```done_q```.
+To enforce the specified scheduling sequence, the scheduler busy-waits for new fibers to start.
 
 ```
 bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
