@@ -1,11 +1,9 @@
-* copy cont+tests from cixl_ucontext
-** convert to jump out of thread scope
-** cont.c
-* add sched.new_q/new sem
+* add sched.new_q sem
 ** protect with q_lock
 ** add in push
 ** post sem in on_start before waiting
-** process like done in loop
+** process with done_q in loop
+*** rename done sem to loop
 ** compare bench6
 * add Concurrency/Tasks to readme
 * --- cxgui
