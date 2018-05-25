@@ -79,10 +79,10 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
     return false;
   }
 
-  cx_ls_prepend(&s->ready_q, &t->q);
   bool ok = cx_task_start(t);
   if (!ok) { goto exit; }
   while (atomic_load(&t->state) == CX_TASK_NEW) { sched_yield(); }
+  cx_ls_prepend(&s->ready_q, &t->q);
  exit:
   if (pthread_mutex_unlock(&s->q_lock) != 0) {
     cx_error(s->cx, s->cx->row, s->cx->col, "Failed locking: %d", errno);
