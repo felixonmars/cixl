@@ -1,5 +1,3 @@
-* replace sched.start with atomic task.is_ready
-** compare bench6
 * coro
 * cont
 * add Concurrency/Tasks to readme

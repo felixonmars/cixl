@@ -16,7 +16,6 @@ struct cx_task {
   struct cx_sched *sched;
   struct cx_box action;
   pthread_t thread;
-  bool is_ready;
   struct cx_ls q;
   
   struct cx_task *prev_task;

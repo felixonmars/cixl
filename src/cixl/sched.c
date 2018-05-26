@@ -15,7 +15,7 @@ struct cx_sched *cx_sched_new(struct cx *cx) {
   struct cx_sched *s = malloc(sizeof(struct cx_sched));
   s->cx = cx;
   s->nruns = 0;
-  s->nready = 0;
+  s->ntasks = 0;
   s->nrefs = 1;
   cx_ls_init(&s->new_q);
   cx_ls_init(&s->ready_q);
@@ -75,6 +75,7 @@ void cx_sched_deref(struct cx_sched *s) {
 }
 
 bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
+  unsigned prev_ntasks = atomic_load(&s->ntasks);
   struct cx_task *t = cx_task_init(malloc(sizeof(struct cx_task)), s, action);
   cx_ls_prepend(&s->new_q, &t->q);
   bool ok = cx_task_start(t);
@@ -85,7 +86,7 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
     return false;
   }
 
-  while (!atomic_load(&t->is_ready)) { sched_yield(); }
+  while (atomic_load(&s->ntasks) == prev_ntasks) { sched_yield(); }
   return true;
 }
 
@@ -95,7 +96,7 @@ bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
     return false;
   }
   
-  while (atomic_load(&s->nready)) {
+  while (atomic_load(&s->ntasks)) {
     if (sem_wait(&s->done) != 0) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed waiting: %d", errno);
       return false;

@@ -12,7 +12,6 @@ struct cx_task *cx_task_init(struct cx_task *t,
 			     struct cx_sched *sched,
 			     struct cx_box *action) {
   t->sched = sched;
-  t->is_ready = false;
   t->prev_task = NULL;
   t->prev_bin = t->bin = NULL;
   t->prev_pc = t->pc = -1;
@@ -100,7 +99,7 @@ static bool run_next(struct cx_task *t) {
     return false;
   }
   
-  while (atomic_load(&t->sched->nready) > 1 &&
+  while (atomic_load(&t->sched->ntasks) > 1 &&
 	 atomic_load(&t->sched->nruns) == prev_nruns) {
     sched_yield();
   }
@@ -158,7 +157,7 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
     cx->ncalls -= ncalls;
   }
 
-  if (atomic_load(&t->sched->nready) > 1 && !run_next(t)) { return false; }
+  if (atomic_load(&t->sched->ntasks) > 1 && !run_next(t)) { return false; }
 
   before_resume(t, cx);
   atomic_fetch_add(&t->sched->nruns, 1);
@@ -168,8 +167,7 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
 static void *on_start(void *data) {
   struct cx_task *t = data;
   struct cx *cx = t->sched->cx;  
-  atomic_fetch_add(&t->sched->nready, 1);
-  atomic_store(&t->is_ready, true);
+  atomic_fetch_add(&t->sched->ntasks, 1);
   
   if (sem_wait(&t->sched->go) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
@@ -213,7 +211,7 @@ static void *on_start(void *data) {
     return false;
   }
 
-  if (atomic_fetch_sub(&t->sched->nready, 1) > 1 &&
+  if (atomic_fetch_sub(&t->sched->ntasks, 1) > 1 &&
       sem_post(&t->sched->go) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed posting go: %d", errno);
   }
