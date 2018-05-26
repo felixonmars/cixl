@@ -11,12 +11,10 @@
 struct cx_sched;
 struct cx_scope;
 
-enum cx_task_state {CX_TASK_NEW, CX_TASK_RUN};
 
 struct cx_task {
   struct cx_sched *sched;
   struct cx_box action;
-  enum cx_task_state state;
   pthread_t thread;
   struct cx_task *prev_task;
   ssize_t prev_pc, pc;

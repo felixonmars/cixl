@@ -12,7 +12,6 @@ struct cx_task *cx_task_init(struct cx_task *t,
 			     struct cx_sched *sched,
 			     struct cx_box *action) {
   t->sched = sched;
-  t->state = CX_TASK_NEW;
   t->prev_task = NULL;
   t->prev_bin = t->bin = NULL;
   t->prev_pc = t->pc = -1;
@@ -91,6 +90,28 @@ static void before_resume(struct cx_task *t, struct cx *cx) {
   }
 }
 
+static bool run_next(struct cx_task *t) {
+  struct cx *cx = t->sched->cx;
+  size_t prev_nruns = t->sched->nruns;
+  
+  if (sem_post(&t->sched->go) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
+    return false;
+  }
+  
+  while (atomic_load(&t->sched->nready) > 1 &&
+	 atomic_load(&t->sched->nruns) == prev_nruns) {
+    sched_yield();
+  }
+  
+  if (sem_wait(&t->sched->go) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
+    return false;
+  }
+
+  return true;
+}
+
 bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
   struct cx *cx = scope->cx;
   cx->task = t->prev_task;
@@ -136,22 +157,7 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
     cx->ncalls -= ncalls;
   }
 
-  if (atomic_load(&t->sched->nready) > 1) {
-    size_t prev_nruns = t->sched->nruns;
-    
-    if (sem_post(&t->sched->go) != 0) {
-      cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
-    }
-
-    while (atomic_load(&t->sched->nready) > 1 &&
-	   atomic_load(&t->sched->nruns) == prev_nruns) {
-      sched_yield();
-    }
-    
-    if (sem_wait(&t->sched->go) != 0) {
-      cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
-    }
-  }
+  if (atomic_load(&t->sched->nready) > 1 && !run_next(t)) { return false; }
 
   before_resume(t, cx);
   atomic_fetch_add(&t->sched->nruns, 1);
@@ -160,13 +166,23 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
 
 static void *on_start(void *data) {
   struct cx_task *t = data;
-  struct cx *cx = t->sched->cx;
-  atomic_store(&t->state, CX_TASK_RUN);
-  atomic_fetch_add(&t->sched->nready, 1);
+  struct cx *cx = t->sched->cx;  
   
   if (sem_wait(&t->sched->go) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
     return NULL;
+  }
+
+  bool ok = false;
+  
+  while (!ok) {
+    if (t->sched->new_q.next == &t->q) {
+      cx_ls_delete(&t->q);
+      cx_ls_prepend(&t->sched->ready_q, &t->q);
+      ok = true;
+    }
+
+    if (!ok && !run_next(t)) { return NULL; }
   }
   
   struct cx_scope *scope = cx_scope(cx, 0);

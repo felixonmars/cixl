@@ -17,6 +17,7 @@ struct cx_sched *cx_sched_new(struct cx *cx) {
   s->nruns = 0;
   s->nready = 0;
   s->nrefs = 1;
+  cx_ls_init(&s->new_q);
   cx_ls_init(&s->ready_q);
   cx_ls_init(&s->done_q);
 
@@ -73,23 +74,17 @@ void cx_sched_deref(struct cx_sched *s) {
 
 bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
   struct cx_task *t = cx_task_init(malloc(sizeof(struct cx_task)), s, action);
-
-  if (pthread_mutex_lock(&s->q_lock) != 0) {
-    cx_error(s->cx, s->cx->row, s->cx->col, "Failed locking: %d", errno);
-    return false;
-  }
-
+  cx_ls_prepend(&s->new_q, &t->q);
   bool ok = cx_task_start(t);
-  if (!ok) { goto exit; }
-  while (atomic_load(&t->state) == CX_TASK_NEW) { sched_yield(); }
-  cx_ls_prepend(&s->ready_q, &t->q);
- exit:
-  if (pthread_mutex_unlock(&s->q_lock) != 0) {
-    cx_error(s->cx, s->cx->row, s->cx->col, "Failed locking: %d", errno);
+  
+  if (!ok) {
+    cx_ls_delete(&t->q);
+    free(cx_task_deinit(t));
     return false;
   }
 
-  return ok;
+  atomic_fetch_add(&t->sched->nready, 1);
+  return true;
 }
 
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
