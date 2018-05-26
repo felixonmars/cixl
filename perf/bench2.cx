@@ -8,4 +8,4 @@ use:
   (cx/var     let:);
 
 unsafe
-{let: v []; 10000000 {$v ~ push} for} clock 1000000 / int say
+{let: v []; 10000000 {$v ~ push} for} clock 1000000 / say

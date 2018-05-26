@@ -14,4 +14,4 @@ use:
   catch: A _;
 } times}
 
-clock 1000000 / int say
+clock 1000000 / say
