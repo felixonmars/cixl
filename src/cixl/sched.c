@@ -13,10 +13,12 @@
 
 struct cx_sched *cx_sched_new(struct cx *cx) {
   struct cx_sched *s = malloc(sizeof(struct cx_sched));
+
   s->cx = cx;
   s->nruns = 0;
   s->ntasks = 0;
   s->nrefs = 1;
+
   cx_ls_init(&s->new_q);
   cx_ls_init(&s->ready_q);
   cx_ls_init(&s->done_q);
