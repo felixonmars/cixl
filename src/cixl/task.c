@@ -167,6 +167,7 @@ bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
 static void *on_start(void *data) {
   struct cx_task *t = data;
   struct cx *cx = t->sched->cx;  
+  atomic_fetch_add(&t->sched->nready, 1);
 
   if (sem_post(&t->sched->start) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);

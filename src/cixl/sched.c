@@ -85,13 +85,11 @@ void cx_sched_deref(struct cx_sched *s) {
 bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
   struct cx_task *t = cx_task_init(malloc(sizeof(struct cx_task)), s, action);
   cx_ls_prepend(&s->new_q, &t->q);
-  atomic_fetch_add(&t->sched->nready, 1);
   bool ok = cx_task_start(t);
   
   if (!ok) {
     cx_ls_delete(&t->q);
     free(cx_task_deinit(t));
-    atomic_fetch_sub(&t->sched->nready, 1);
     return false;
   }
 
