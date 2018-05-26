@@ -21,6 +21,10 @@ struct cx_sched *cx_sched_new(struct cx *cx) {
   cx_ls_init(&s->ready_q);
   cx_ls_init(&s->done_q);
 
+  if (sem_init(&s->start, false, 0) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed initializing semaphore: %d", errno);
+  }
+
   if (sem_init(&s->go, false, 0) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed initializing semaphore: %d", errno);
   }
@@ -46,20 +50,26 @@ void cx_sched_deref(struct cx_sched *s) {
   s->nrefs--;
   
   if (!s->nrefs) {
+    if (sem_destroy(&s->start) != 0) {
+      cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying start: %d", errno);
+    }
+
     if (sem_destroy(&s->go) != 0) {
-      cx_error(s->cx, s->cx->row, s->cx->col,
-	       "Failed destroying semaphore: %d", errno);
+      cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying go: %d", errno);
     }
 
     if (sem_destroy(&s->done) != 0) {
-      cx_error(s->cx, s->cx->row, s->cx->col,
-	       "Failed destroying semaphore: %d", errno);
+      cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying done: %d", errno);
     }
 
     if (pthread_mutex_destroy(&s->q_lock) != 0) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying mutex: %d", errno);
     }
-  
+
+    cx_do_ls(&s->new_q, tp) {
+      free(cx_task_deinit(cx_baseof(tp, struct cx_task, q)));
+    }
+    
     cx_do_ls(&s->ready_q, tp) {
       free(cx_task_deinit(cx_baseof(tp, struct cx_task, q)));
     }
@@ -80,6 +90,11 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
   if (!ok) {
     cx_ls_delete(&t->q);
     free(cx_task_deinit(t));
+    return false;
+  }
+
+  if (sem_wait(&s->start) != 0) {
+    cx_error(s->cx, s->cx->row, s->cx->col, "Failed waiting: %d", errno);
     return false;
   }
 
