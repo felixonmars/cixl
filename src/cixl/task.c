@@ -12,6 +12,7 @@ struct cx_task *cx_task_init(struct cx_task *t,
 			     struct cx_sched *sched,
 			     struct cx_box *action) {
   t->sched = sched;
+  t->is_ready = false;
   t->prev_task = NULL;
   t->prev_bin = t->bin = NULL;
   t->prev_pc = t->pc = -1;
@@ -168,11 +169,7 @@ static void *on_start(void *data) {
   struct cx_task *t = data;
   struct cx *cx = t->sched->cx;  
   atomic_fetch_add(&t->sched->nready, 1);
-
-  if (sem_post(&t->sched->start) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
-    return NULL;
-  }
+  atomic_store(&t->is_ready, true);
   
   if (sem_wait(&t->sched->go) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);

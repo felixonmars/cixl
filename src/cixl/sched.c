@@ -21,10 +21,6 @@ struct cx_sched *cx_sched_new(struct cx *cx) {
   cx_ls_init(&s->ready_q);
   cx_ls_init(&s->done_q);
 
-  if (sem_init(&s->start, false, 0) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed initializing semaphore: %d", errno);
-  }
-
   if (sem_init(&s->go, false, 0) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed initializing semaphore: %d", errno);
   }
@@ -50,10 +46,6 @@ void cx_sched_deref(struct cx_sched *s) {
   s->nrefs--;
   
   if (!s->nrefs) {
-    if (sem_destroy(&s->start) != 0) {
-      cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying start: %d", errno);
-    }
-
     if (sem_destroy(&s->go) != 0) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying go: %d", errno);
     }
@@ -93,11 +85,7 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
     return false;
   }
 
-  if (sem_wait(&s->start) != 0) {
-    cx_error(s->cx, s->cx->row, s->cx->col, "Failed waiting: %d", errno);
-    return false;
-  }
-
+  while (!atomic_load(&t->is_ready)) { sched_yield(); }
   return true;
 }
 
