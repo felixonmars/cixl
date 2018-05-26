@@ -1,6 +1,6 @@
 * coro
+* add Concurrency/Tasks/Coros to readme
 * cont
-* add Concurrency/Tasks to readme
 * --- cxgui
 ** move start-script calls to window show event
 *** add on-show fn

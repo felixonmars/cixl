@@ -168,7 +168,6 @@ static void *on_start(void *data) {
   struct cx_task *t = data;
   struct cx *cx = t->sched->cx;  
   atomic_fetch_add(&t->sched->ntasks, 1);
-
   bool ok = false;
   
   while (!ok) {
