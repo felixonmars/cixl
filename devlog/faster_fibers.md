@@ -68,7 +68,7 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
 }
 ```
 
-While fibers do little more than update the scheduler count before hitting the ```go``` semaphore.
+While fibers update the scheduler and hit the ```go``` semaphore first thing.
 
 task.[h](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/task.h)/[c](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/task.c)
 ```
