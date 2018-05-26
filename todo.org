@@ -1,4 +1,10 @@
 * coro
+** add coro lib with coro + resume fns
+*** copy task
+** copy state management from task
+* add task alloc
+** compare bench6
+* add coro alloc
 * add Concurrency/Tasks/Coros to readme
 * cont
 * --- cxgui

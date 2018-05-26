@@ -68,7 +68,7 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
 }
 ```
 
-While fibers update the scheduler and hit the ```go``` semaphore first thing, and postpone checking the order until first resume.
+While fibers update the scheduler, make sure they're in order and hit the semaphore.
 
 task.[h](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/task.h)/[c](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/task.c)
 ```

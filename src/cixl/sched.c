@@ -27,12 +27,12 @@ struct cx_sched *cx_sched_new(struct cx *cx) {
     cx_error(cx, cx->row, cx->col, "Failed initializing run: %d", errno);
   }
 
-  if (pthread_mutex_init(&s->q_lock, NULL) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed initializing q lock: %d", errno);
-  }
-
   if (sem_init(&s->done, false, 0) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed initializing done: %d", errno);
+  }
+
+  if (pthread_mutex_init(&s->q_lock, NULL) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed initializing q lock: %d", errno);
   }
 
   return s;
@@ -48,12 +48,12 @@ void cx_sched_deref(struct cx_sched *s) {
   s->nrefs--;
   
   if (!s->nrefs) {
-    if (sem_destroy(&s->done) != 0) {
-      cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying done: %d", errno);
-    }
-
     if (pthread_mutex_destroy(&s->q_lock) != 0) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying q lock: %d", errno);
+    }
+
+    if (sem_destroy(&s->done) != 0) {
+      cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying done: %d", errno);
     }
 
     if (sem_destroy(&s->run) != 0) {

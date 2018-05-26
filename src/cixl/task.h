@@ -6,7 +6,7 @@
 #include "cixl/box.h"
 #include "cixl/ls.h"
 
-#define CX_TASK_STACK_SIZE 32000
+#define CX_TASK_STACK_SIZE (32*1024)
 
 struct cx_sched;
 struct cx_scope;
