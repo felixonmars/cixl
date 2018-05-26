@@ -1,4 +1,4 @@
-n = 1000
+n = 10000
 fs = []
 
 n.times {fs << Fiber.new {Fiber.yield}}

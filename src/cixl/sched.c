@@ -23,16 +23,16 @@ struct cx_sched *cx_sched_new(struct cx *cx) {
   cx_ls_init(&s->ready_q);
   cx_ls_init(&s->done_q);
 
-  if (sem_init(&s->go, false, 0) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed initializing semaphore: %d", errno);
-  }
-
-  if (sem_init(&s->done, false, 0) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed initializing semaphore: %d", errno);
+  if (sem_init(&s->run, false, 0) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed initializing run: %d", errno);
   }
 
   if (pthread_mutex_init(&s->q_lock, NULL) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed initializing mutex: %d", errno);
+    cx_error(cx, cx->row, cx->col, "Failed initializing q lock: %d", errno);
+  }
+
+  if (sem_init(&s->done, false, 0) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed initializing done: %d", errno);
   }
 
   return s;
@@ -48,16 +48,17 @@ void cx_sched_deref(struct cx_sched *s) {
   s->nrefs--;
   
   if (!s->nrefs) {
-    if (sem_destroy(&s->go) != 0) {
-      cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying go: %d", errno);
-    }
-
     if (sem_destroy(&s->done) != 0) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying done: %d", errno);
     }
 
     if (pthread_mutex_destroy(&s->q_lock) != 0) {
-      cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying mutex: %d", errno);
+      cx_error(s->cx, s->cx->row, s->cx->col, "Failed destroying q lock: %d", errno);
+    }
+
+    if (sem_destroy(&s->run) != 0) {
+      cx_error(s->cx, s->cx->row, s->cx->col,
+	       "Failed destroying run: %d", errno);
     }
 
     cx_do_ls(&s->new_q, tp) {
@@ -93,20 +94,24 @@ bool cx_sched_push(struct cx_sched *s, struct cx_box *action) {
 }
 
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
-  if (sem_post(&s->go) != 0) {
-    cx_error(s->cx, s->cx->row, s->cx->col, "Failed posting: %d", errno);
+  if (sem_post(&s->run) != 0) {
+    cx_error(s->cx, s->cx->row, s->cx->col, "Failed posting run: %d", errno);
     return false;
   }
-  
+
+  bool ok = false;
+
   while (atomic_load(&s->ntasks)) {
     if (sem_wait(&s->done) != 0) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed waiting: %d", errno);
-      return false;
+      goto exit;
     }
+
+    if (!atomic_load(&s->ntasks)) { break; }
     
     if (pthread_mutex_lock(&s->q_lock) != 0) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed locking: %d", errno);
-      return false;
+      goto exit;
     }
 
     struct cx_task *t = cx_baseof(s->done_q.next, struct cx_task, q);
@@ -115,7 +120,7 @@ bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
 
     if (pthread_mutex_unlock(&s->q_lock) != 0) {
       cx_error(s->cx, s->cx->row, s->cx->col, "Failed unlocking: %d", errno);
-      return false;
+      goto exit;
     }
   }
 
@@ -125,7 +130,14 @@ bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
     free(cx_task_deinit(t));
   }
 
-  return true;
+  ok = true;
+ exit:
+  if (sem_wait(&s->run) != 0) {
+    cx_error(s->cx, s->cx->row, s->cx->col, "Failed waiting for run: %d", errno);
+    ok = false;
+  }
+
+  return ok;
 }
 
 static void new_imp(struct cx_box *out) {

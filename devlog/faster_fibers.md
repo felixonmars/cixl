@@ -12,14 +12,14 @@ The scheduler loop is reduced to launching the first and cleaning up finished fi
 sched.[h](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/sched.h)/[c](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/sched.c)
 ```
 bool cx_sched_run(struct cx_sched *s, struct cx_scope *scope) {
-  if (sem_post(&s->go) != 0) {
-    cx_error(s->cx, s->cx->row, s->cx->col, "Failed posting: %d", errno);
+  if (sem_post(&s->run) != 0) {
+    cx_error(s->cx, s->cx->row, s->cx->col, "Failed posting run: %d", errno);
     return false;
   }
   
   while (atomic_load(&s->ntasks)) {
     if (sem_wait(&s->done) != 0) {
-      cx_error(s->cx, s->cx->row, s->cx->col, "Failed waiting: %d", errno);
+      cx_error(s->cx, s->cx->row, s->cx->col, "Failed waiting on done: %d", errno);
       return false;
     }
     
@@ -72,38 +72,11 @@ While fibers update the scheduler and hit the ```go``` semaphore first thing, an
 
 task.[h](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/task.h)/[c](https://github.com/basic-gongfu/cixl/blob/master/src/cixl/task.c)
 ```
-bool run_next(struct cx_task *t) {
-  struct cx *cx = t->sched->cx;
-  size_t prev_nruns = t->sched->nruns;
-  
-  if (sem_post(&t->sched->go) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
-    return false;
-  }
-  
-  while (atomic_load(&t->sched->ntasks) > 1 &&
-	 atomic_load(&t->sched->nruns) == prev_nruns) {
-    sched_yield();
-  }
-  
-  if (sem_wait(&t->sched->go) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
-    return false;
-  }
-
-  return true;
-}
-
 void *on_start(void *data) {
   struct cx_task *t = data;
   struct cx *cx = t->sched->cx;  
   atomic_fetch_add(&t->sched->ntasks, 1);
   
-  if (sem_wait(&t->sched->go) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
-    return NULL;
-  }
-
   bool ok = false;
   
   while (!ok) {
@@ -115,7 +88,12 @@ void *on_start(void *data) {
 
     if (!ok && !run_next(t)) { return NULL; }
   }
-  
+
+  if (sem_wait(&t->sched->run) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed waiting on run: %d", errno);
+    return NULL;
+  }
+
   struct cx_scope *scope = cx_scope(cx, 0);
   before_run(t, scope->cx);
   atomic_fetch_add(&t->sched->nruns, 1);
@@ -142,8 +120,8 @@ void *on_start(void *data) {
   }
 
   if (atomic_fetch_sub(&t->sched->ntasks, 1) > 1 &&
-      sem_post(&t->sched->go) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed posting go: %d", errno);
+      sem_post(&t->sched->run) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed posting run: %d", errno);
   }
 
   if (sem_post(&t->sched->done) != 0) {
@@ -166,6 +144,28 @@ bool cx_task_start(struct cx_task *t) {
 
   pthread_attr_destroy(&a);
   return ok;
+}
+
+bool run_next(struct cx_task *t) {
+  struct cx *cx = t->sched->cx;
+  size_t prev_nruns = t->sched->nruns;
+  
+  if (sem_post(&t->sched->run) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed posting run: %d", errno);
+    return false;
+  }
+  
+  while (atomic_load(&t->sched->ntasks) > 1 &&
+	 atomic_load(&t->sched->nruns) == prev_nruns) {
+    sched_yield();
+  }
+  
+  if (sem_wait(&t->sched->run) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed waiting on run: %d", errno);
+    return false;
+  }
+
+  return true;
 }
 ```
 
@@ -198,14 +198,14 @@ let: s Sched new;
 {$s run} clock 1000000 / say
 
 $ cixl bench5.cx
-1257
+1165
 ```
 
-One of the reasons often given for avoiding threads is that they are expensive to create. Ensuring that fibers start in specified order adds another performance penalty on top. Still, unless you're creating thousands of them in tight loops; I doubt this will be a problem in practice.
+One of the reasons often given for avoiding threads is that they are expensive to create. Ensuring that fibers start in specified order adds another performance penalty on top. Except where creating thousands in tight loops, I doubt this will be a problem in practice.
 
 [bench6.rb](https://github.com/basic-gongfu/cixl/blob/master/perf/bench6.rb)
 ```
-n = 1000
+n = 10000
 fs = []
 
 n.times {fs << Fiber.new {Fiber.yield}}
@@ -217,21 +217,21 @@ delta = (t2 - t1) * 1000
 puts "#{delta.to_i}"
 
 $ ruby bench6.rb
-15
+155
 ```
 
 [bench6.cx](https://github.com/basic-gongfu/cixl/blob/master/perf/bench6.cx)
 ```
 use: cx;
 
-define: n 1000;
+define: n 10000;
 let: s Sched new;
 
 #n {$s &resched push} times
 {$s run} clock 1000000 / say
 
 $ cixl bench6.cx
-52
+186
 ```
 
 Give me a yell if something is unclear, wrong or missing. And please consider helping out with a donation via [paypal](https://paypal.me/basicgongfu) or [liberapay](https://liberapay.com/basic-gongfu/donate) if you find this worthwhile, every contribution counts.

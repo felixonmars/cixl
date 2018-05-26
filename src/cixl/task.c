@@ -94,8 +94,8 @@ static bool run_next(struct cx_task *t) {
   struct cx *cx = t->sched->cx;
   size_t prev_nruns = t->sched->nruns;
   
-  if (sem_post(&t->sched->go) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed posting: %d", errno);
+  if (sem_post(&t->sched->run) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed posting run: %d", errno);
     return false;
   }
   
@@ -104,8 +104,8 @@ static bool run_next(struct cx_task *t) {
     sched_yield();
   }
   
-  if (sem_wait(&t->sched->go) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
+  if (sem_wait(&t->sched->run) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed waiting on run: %d", errno);
     return false;
   }
 
@@ -168,11 +168,6 @@ static void *on_start(void *data) {
   struct cx_task *t = data;
   struct cx *cx = t->sched->cx;  
   atomic_fetch_add(&t->sched->ntasks, 1);
-  
-  if (sem_wait(&t->sched->go) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed waiting: %d", errno);
-    return NULL;
-  }
 
   bool ok = false;
   
@@ -185,7 +180,12 @@ static void *on_start(void *data) {
 
     if (!ok && !run_next(t)) { return NULL; }
   }
-  
+
+  if (sem_wait(&t->sched->run) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed waiting on run: %d", errno);
+    return NULL;
+  }
+
   struct cx_scope *scope = cx_scope(cx, 0);
   before_run(t, scope->cx);
   atomic_fetch_add(&t->sched->nruns, 1);
@@ -198,9 +198,14 @@ static void *on_start(void *data) {
   while (cx->scopes.count > t->prev_nscopes) { cx_pop_scope(cx, false); }
   while (cx->ncalls > t->prev_ncalls) { cx_test(cx_pop_call(cx)); }
 
+  if (sem_post(&t->sched->run) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed posting run: %d", errno);
+    return NULL;
+  }
+  
   if (pthread_mutex_lock(&t->sched->q_lock) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed locking: %d", errno);
-    return false;
+    return NULL;
   }
 
   cx_ls_delete(&t->q);
@@ -208,13 +213,10 @@ static void *on_start(void *data) {
 
   if (pthread_mutex_unlock(&t->sched->q_lock) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed unlocking: %d", errno);
-    return false;
+    return NULL;
   }
-
-  if (atomic_fetch_sub(&t->sched->ntasks, 1) > 1 &&
-      sem_post(&t->sched->go) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed posting go: %d", errno);
-  }
+  
+  atomic_fetch_sub(&t->sched->ntasks, 1);
 
   if (sem_post(&t->sched->done) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed posting done: %d", errno);
@@ -223,10 +225,10 @@ static void *on_start(void *data) {
   return NULL;
 }
 
-bool cx_task_start(struct cx_task *t) {  
+bool cx_task_start(struct cx_task *t) {
   pthread_attr_t a;
   pthread_attr_init(&a);
-  pthread_attr_setstacksize(&a, CX_TASK_STACK_SIZE);
+  pthread_attr_setstacksize(&a, CX_TASK_STACK_SIZE);  
   bool ok = pthread_create(&t->thread, &a, on_start, t) == 0;
 
   if (!ok) {

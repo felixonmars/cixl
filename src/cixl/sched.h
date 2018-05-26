@@ -16,8 +16,8 @@ struct cx_type;
 struct cx_sched {
   struct cx *cx;  
   struct cx_ls new_q, ready_q, done_q;
+  sem_t run, done;
   pthread_mutex_t q_lock;
-  sem_t go, done;
   unsigned ntasks, nruns, nrefs;
 };
 
