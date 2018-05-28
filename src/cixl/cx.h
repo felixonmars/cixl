@@ -11,7 +11,7 @@
 #include "cixl/type.h"
 
 #define CX_VERSION "0.9.7"
-#define CX_SLAB_SIZE 20				  
+#define CX_SLAB_SIZE 32				  
 #define CX_MAX_CALLS 64
 
 struct cx_arg;
@@ -31,7 +31,7 @@ struct cx {
     pair_alloc,
     rec_alloc, ref_alloc,
     scope_alloc, stack_alloc, stack_items_alloc,
-    table_alloc,
+    table_alloc, task_alloc,
     var_alloc;
 
   struct cx_vec types,

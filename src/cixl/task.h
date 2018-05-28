@@ -26,6 +26,10 @@ struct cx_task {
   struct cx_vec libs, scopes, calls;
 };
 
+
+struct cx_task *cx_task_new(struct cx_sched *sched, struct cx_box *action);
+void cx_task_free(struct cx_task *t);
+
 struct cx_task *cx_task_init(struct cx_task *t,
 			     struct cx_sched *sched,
 			     struct cx_box *action);

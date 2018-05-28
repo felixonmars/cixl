@@ -57,6 +57,7 @@
 #include "cixl/stack.h"
 #include "cixl/str.h"
 #include "cixl/table.h"
+#include "cixl/task.h"
 #include "cixl/util.h"
 
 static const void *get_lib_id(const void *value) {
@@ -117,6 +118,7 @@ struct cx *cx_init(struct cx *cx) {
   cx_malloc_init(&cx->ref_alloc, CX_SLAB_SIZE, sizeof(struct cx_ref));
   cx_malloc_init(&cx->scope_alloc, CX_SLAB_SIZE, sizeof(struct cx_scope));
   cx_malloc_init(&cx->table_alloc, CX_SLAB_SIZE, sizeof(struct cx_table));
+  cx_malloc_init(&cx->task_alloc, CX_SLAB_SIZE, sizeof(struct cx_task));
   cx_malloc_init(&cx->var_alloc, CX_SLAB_SIZE, sizeof(struct cx_var));
   cx_malloc_init(&cx->stack_alloc, CX_SLAB_SIZE, sizeof(struct cx_stack));
   
@@ -258,6 +260,7 @@ struct cx *cx_deinit(struct cx *cx) {
   cx_malloc_deinit(&cx->ref_alloc);
   cx_malloc_deinit(&cx->scope_alloc);
   cx_malloc_deinit(&cx->table_alloc);
+  cx_malloc_deinit(&cx->task_alloc);
   cx_malloc_deinit(&cx->var_alloc);
   cx_malloc_deinit(&cx->stack_alloc);
   cx_malloc_deinit(&cx->stack_items_alloc);

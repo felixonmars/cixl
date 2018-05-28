@@ -8,6 +8,15 @@
 #include "cixl/scope.h"
 #include "cixl/task.h"
 
+struct cx_task *cx_task_new(struct cx_sched *sched, struct cx_box *action) {
+  return cx_task_init(cx_malloc(&sched->cx->task_alloc), sched, action);
+}
+
+void cx_task_free(struct cx_task *t) {
+  cx_task_deinit(t);
+  cx_free(&t->sched->cx->task_alloc, t);
+}
+
 struct cx_task *cx_task_init(struct cx_task *t,
 			     struct cx_sched *sched,
 			     struct cx_box *action) {
