@@ -12,6 +12,7 @@ struct cx_task *cx_task_init(struct cx_task *t,
 			     struct cx_sched *sched,
 			     struct cx_box *action) {
   t->sched = sched;
+  t->prev_coro = NULL;
   t->prev_task = NULL;
   t->prev_bin = t->bin = NULL;
   t->prev_pc = t->pc = -1;
@@ -42,6 +43,7 @@ struct cx_task *cx_task_deinit(struct cx_task *t) {
 }
 
 static void before_run(struct cx_task *t, struct cx *cx) {
+  t->prev_coro = cx->coro;
   t->prev_task = cx->task;
   cx->task = t;
   t->prev_bin = cx->bin;
@@ -114,6 +116,7 @@ static bool run_next(struct cx_task *t) {
 
 bool cx_task_resched(struct cx_task *t, struct cx_scope *scope) {
   struct cx *cx = scope->cx;
+  cx->coro = t->prev_coro;
   cx->task = t->prev_task;
   t->bin = cx->bin;
   cx->bin = t->prev_bin;
@@ -190,6 +193,7 @@ static void *on_start(void *data) {
   atomic_fetch_add(&t->sched->nruns, 1);
   cx_call(&t->action, scope);
 
+  cx->coro = t->prev_coro;
   cx->task = t->prev_task;
   cx->bin = t->prev_bin;
   cx->pc = t->prev_pc;

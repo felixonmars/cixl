@@ -23,6 +23,7 @@
 #include "cixl/lib/buf.h"
 #include "cixl/lib/cond.h"
 #include "cixl/lib/const.h"
+#include "cixl/lib/coro.h"
 #include "cixl/lib/error.h"
 #include "cixl/lib/func.h"
 #include "cixl/lib/gfx.h"
@@ -71,6 +72,7 @@ cx_lib(cx_init_world, "cx") {
     cx_use(cx, "cx/bin") &&
     cx_use(cx, "cx/cond") &&
     cx_use(cx, "cx/const") &&
+    cx_use(cx, "cx/coro") &&
     cx_use(cx, "cx/error") &&
     cx_use(cx, "cx/func") &&
     cx_use(cx, "cx/gfx") &&
@@ -101,6 +103,7 @@ struct cx *cx_init(struct cx *cx) {
   cx->next_sym_tag = cx->next_type_tag = 0;
   cx->ncalls = 0;
   cx->task = NULL;
+  cx->coro = NULL;
   cx->bin = NULL;
   cx->pc = 0;
   cx->row = cx->col = -1;
@@ -147,7 +150,7 @@ struct cx *cx_init(struct cx *cx) {
 
   cx->any_type =
     cx->bin_type = cx->bool_type = cx->buf_type = 
-    cx->char_type = cx->cmp_type = cx->color_type = 
+    cx->char_type = cx->cmp_type = cx->color_type = cx->coro_type = 
     cx->error_type =
     cx->file_type = cx->fimp_type = cx->float_type = cx->func_type =
     cx->int_type = cx->iter_type =
@@ -174,6 +177,7 @@ void cx_init_libs(struct cx *cx) {
   cx_init_buf(cx);
   cx_init_cond(cx);
   cx_init_const(cx);
+  cx_init_coro(cx);
   cx_init_error(cx);
   cx_init_func(cx);
   cx_init_gfx(cx);

@@ -6,6 +6,7 @@ include:
 
   'bin.cx'
   'cond.cx'
+  'coro.cx'
   'error.cx'
   'func.cx'
   'iter.cx'

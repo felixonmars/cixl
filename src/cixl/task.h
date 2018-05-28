@@ -8,9 +8,9 @@
 
 #define CX_TASK_STACK_SIZE (32*1024)
 
+struct cx_coro;
 struct cx_sched;
 struct cx_scope;
-
 
 struct cx_task {
   struct cx_sched *sched;
@@ -18,6 +18,7 @@ struct cx_task {
   pthread_t thread;
   struct cx_ls q;
   
+  struct cx_coro *prev_coro;
   struct cx_task *prev_task;
   ssize_t prev_pc, pc;
   struct cx_bin *prev_bin, *bin;

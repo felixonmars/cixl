@@ -1,10 +1,10 @@
 * coro
-** add coro lib with coro + resume fns
-*** copy task
-** copy state management from task
+** finish iter
 * add task alloc
 ** compare bench6
+* convert task to use cx_cont
 * add coro alloc
+* add lua coro bench
 * add Concurrency/Tasks/Coros to readme
 * cont
 * --- cxgui

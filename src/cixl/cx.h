@@ -46,7 +46,7 @@ struct cx {
 
   struct cx_type *any_type,
     *bin_type, *bool_type, *buf_type,
-    *char_type, *cmp_type, *color_type,
+    *char_type, *cmp_type, *color_type, *coro_type,
     *error_type,
     *file_type, *fimp_type, *float_type, *func_type,
     *int_type, *iter_type,
@@ -72,6 +72,7 @@ struct cx {
   unsigned int ncalls;
 
   struct cx_task *task;
+  struct cx_coro *coro;
   struct cx_bin *bin;
   size_t pc;
   

@@ -1,0 +1,7 @@
+'Testing cx/coro...' say
+
+(
+  let: c1 {1 return 3 return} coro;
+  let: c2 {$c1 % call ~ call + return} coro;
+  $c2 call 4 = check
+)
