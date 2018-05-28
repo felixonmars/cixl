@@ -13,7 +13,7 @@ struct cx_type;
 
 #define CX_CORO_STACK_SIZE (32*1024)
 
-enum cx_coro_state {CX_CORO_NEW, CX_CORO_RESUME, CX_CORO_DONE, CX_CORO_FREE};
+enum cx_coro_state {CX_CORO_NEW, CX_CORO_RUN, CX_CORO_DONE, CX_CORO_FREE};
 
 struct cx_coro {
   struct cx *cx;

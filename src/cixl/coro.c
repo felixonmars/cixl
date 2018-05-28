@@ -109,7 +109,7 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
   
   switch (c->state) {
   case CX_CORO_NEW: {
-    c->state = CX_CORO_RESUME;
+    c->state = CX_CORO_RUN;
     cx_cont_reset(&c->cont);
     cx->coro = c;
 
@@ -131,7 +131,7 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
     
     break;
   }
-  case CX_CORO_RESUME: {
+  case CX_CORO_RUN: {
     cx_cont_resume(&c->cont);
     cx->coro = c;
     
