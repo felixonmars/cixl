@@ -13,7 +13,7 @@ struct cx_type;
 
 #define CX_CORO_STACK_SIZE (32*1024)
 
-enum cx_coro_state {CX_CORO_NEW, CX_CORO_RESUME, CX_CORO_DONE};
+enum cx_coro_state {CX_CORO_NEW, CX_CORO_RESUME, CX_CORO_DONE, CX_CORO_FREE};
 
 struct cx_coro {
   struct cx *cx;
@@ -34,6 +34,8 @@ struct cx_coro *cx_coro_ref(struct cx_coro *c);
 void cx_coro_deref(struct cx_coro *c);
 struct cx_coro *cx_coro_deinit(struct cx_coro *c);
 bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope);
+bool cx_coro_reset(struct cx_coro *c);
+bool cx_coro_cancel(struct cx_coro *c);
 bool cx_coro_return(struct cx_coro *c, struct cx_scope *scope);
 
 struct cx_type *cx_init_coro_type(struct cx_lib *lib);

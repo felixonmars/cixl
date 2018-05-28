@@ -20,13 +20,18 @@ struct cx_cont *cx_cont_init(struct cx_cont *c, struct cx *cx) {
 }
 
 struct cx_cont *cx_cont_deinit(struct cx_cont *c) {
-  cx_do_vec(&c->scopes, struct cx_scope *, s) { cx_scope_deref(*s); }
-  cx_do_vec(&c->calls, struct cx_call, call) { cx_call_deinit(call); }
-  
+  cx_cont_clear(c);
   cx_vec_deinit(&c->libs);
   cx_vec_deinit(&c->scopes);
   cx_vec_deinit(&c->calls);
   return c;
+}
+
+void cx_cont_clear(struct cx_cont *c) {
+  cx_do_vec(&c->scopes, struct cx_scope *, s) { cx_scope_deref(*s); }
+  cx_vec_clear(&c->scopes);
+  cx_do_vec(&c->calls, struct cx_call, call) { cx_call_deinit(call); }
+  cx_vec_clear(&c->calls);
 }
 
 void cx_cont_reset(struct cx_cont *c) {

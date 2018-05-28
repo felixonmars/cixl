@@ -1,14 +1,21 @@
-* coro
-** add cancel fn
-*** cx_coro_cancel
-*** check state != DONE
-*** cancel/join thread
-*** free/clear state
-** add reset fn
-*** restart coro
+* add coro
+** add lua coro bench
+*** add coro alloc
 ** finish iter
-* add lua coro bench
-* add coro alloc
+*** add iter test
+* switch cx_type methods to take raw values
+** replace cx_box with cx_type & void *
+** add get/set methods
+* add type specific alloc
+** cx_type.alloc
+*** add cx_type.size() method
+*** use instead of cx allocs
+* add tuples
+** alloc whole block of memory
+** use cx_box as default field type
+** add Tuple<> type
+** add tuple lib with get/put
+** parse [] literals as tuples?
 * add Concurrency/Tasks/Coros to readme
 * convert task to use cx_cont
 * --- cxgui

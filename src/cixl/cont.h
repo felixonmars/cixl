@@ -18,6 +18,7 @@ struct cx_cont {
 
 struct cx_cont *cx_cont_init(struct cx_cont *c, struct cx *cx);
 struct cx_cont *cx_cont_deinit(struct cx_cont *c);
+void cx_cont_clear(struct cx_cont *c);
 void cx_cont_reset(struct cx_cont *c);
 void cx_cont_return(struct cx_cont *c);
 void cx_cont_resume(struct cx_cont *c);

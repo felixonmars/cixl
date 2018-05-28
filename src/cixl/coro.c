@@ -40,13 +40,21 @@ struct cx_coro *cx_coro_ref(struct cx_coro *c) {
 struct cx_coro *cx_coro_deinit(struct cx_coro *c) {
   struct cx *cx = c->cx;
 
-  if (pthread_join(c->thread, NULL) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed joining thread: %d", errno);
+  if (c->state != CX_CORO_NEW) {
+    if (c->state != CX_CORO_DONE && pthread_join(c->thread, NULL) != 0) {
+      cx_error(cx, cx->row, cx->col, "Failed cancelling thread: %d", errno);
+    }
+    
+    if (pthread_join(c->thread, NULL) != 0) {
+      cx_error(cx, cx->row, cx->col, "Failed joining thread: %d", errno);
+    }
   }
   
-  cx_box_deinit(&c->action);
-  cx_cont_deinit(&c->cont);
-  
+  if (c->state != CX_CORO_FREE) {
+    cx_box_deinit(&c->action);
+    cx_cont_deinit(&c->cont);
+  }
+
   if (sem_destroy(&c->on_return) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed destroying return: %d", errno);
   }
@@ -66,14 +74,17 @@ void cx_coro_deref(struct cx_coro *c) {
 
 static void return_stack(struct cx_scope *src) {
   struct cx_scope *dst = cx_scope(src->cx, 0);
-  cx_vec_grow(&dst->stack, dst->stack.count+src->stack.count);
   
-  memcpy(cx_vec_end(&dst->stack),
-	 src->stack.items,
-	 sizeof(struct cx_box) * src->stack.count);
-  
-  dst->stack.count += src->stack.count;
-  cx_vec_clear(&src->stack);
+  if (dst != src) {
+    cx_vec_grow(&dst->stack, dst->stack.count+src->stack.count);
+    
+    memcpy(cx_vec_end(&dst->stack),
+	   src->stack.items,
+	   sizeof(struct cx_box) * src->stack.count);
+    
+    dst->stack.count += src->stack.count;
+    cx_vec_clear(&src->stack);
+  }
 }
 
 static void *on_start(void *data) {
@@ -139,11 +150,59 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
   case CX_CORO_DONE:
     cx_error(cx, cx->row, cx->col, "Coro is done");
     goto exit;
+  case CX_CORO_FREE:
+    cx_error(cx, cx->row, cx->col, "Coro is cancelled");
+    goto exit;
   }
 
   ok = true;
  exit:
   return ok;
+}
+
+bool cx_coro_reset(struct cx_coro *c) {
+  if (c->state == CX_CORO_NEW) { return true; }
+  struct cx *cx = c->cx;  
+
+  if (c->state != CX_CORO_DONE) {
+    if (pthread_cancel(c->thread) != 0) {
+      cx_error(cx, cx->row, cx->col, "Failed cancelling thread: %d", errno);
+      return false;
+    }
+  }
+
+  if (pthread_join(c->thread, NULL) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed joining thread: %d", errno);
+    return false;
+  }
+  
+  cx_cont_clear(&c->cont);
+  c->state = CX_CORO_NEW;
+  return true;
+}
+
+bool cx_coro_cancel(struct cx_coro *c) {
+  if (c->state == CX_CORO_FREE) { return true; }
+  struct cx *cx = c->cx;
+  
+  if (c->state != CX_CORO_NEW) {
+    if (c->state != CX_CORO_DONE) {
+      if (pthread_cancel(c->thread) != 0) {
+	cx_error(cx, cx->row, cx->col, "Failed cancelling thread: %d", errno);
+	return false;
+      }
+    }
+    
+    if (pthread_join(c->thread, NULL) != 0) {
+      cx_error(cx, cx->row, cx->col, "Failed joining thread: %d", errno);
+      return false;
+    }
+  }
+
+  cx_box_deinit(&c->action);
+  cx_cont_deinit(&c->cont);
+  c->state = CX_CORO_FREE;
+  return true;
 }
 
 bool cx_coro_return(struct cx_coro *c, struct cx_scope *scope) {

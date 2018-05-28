@@ -16,7 +16,7 @@
 
 static bool coro_imp(struct cx_call *call) {
   struct cx_scope *s = call->scope;
-  struct cx_box *a = cx_test(cx_call_arg(call, 0)); 
+  struct cx_box *a = cx_test(cx_call_arg(call, 0));
   cx_box_init(cx_push(s), s->cx->coro_type)->as_ptr = cx_coro_new(s->cx, a);
   return true;
 }
@@ -31,6 +31,16 @@ static bool return_imp(struct cx_call *call) {
   }
   
   return cx_coro_return(c, s);
+}
+
+static bool reset_imp(struct cx_call *call) {
+  struct cx_coro *c = cx_test(cx_call_arg(call, 0))->as_ptr;
+  return cx_coro_reset(c);
+}
+
+static bool cancel_imp(struct cx_call *call) {
+  struct cx_coro *c = cx_test(cx_call_arg(call, 0))->as_ptr;
+  return cx_coro_cancel(c);
 }
 
 cx_lib(cx_init_coro, "cx/coro") {    
@@ -51,6 +61,16 @@ cx_lib(cx_init_coro, "cx/coro") {
 	       cx_args(),
 	       cx_args(),
 	       return_imp);
+
+  cx_add_cfunc(lib, "reset",
+	       cx_args(cx_arg("coro", cx->coro_type)),
+	       cx_args(),
+	       reset_imp);
+
+  cx_add_cfunc(lib, "cancel",
+	       cx_args(cx_arg("coro", cx->coro_type)),
+	       cx_args(),
+	       cancel_imp);
 
   return true;
 }

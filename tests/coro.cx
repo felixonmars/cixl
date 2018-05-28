@@ -1,7 +1,18 @@
 'Testing cx/coro...' say
 
 (
+  let: c {1 return 3 return 5} coro;
+  $c call 1 = check
+  $c call 3 = check
+  $c reset
+  $c call 1 = check
+  $c call 3 = check
+  $c call 5 = check
+)
+
+(
   let: c1 {1 return 3 return} coro;
   let: c2 {$c1 % call ~ call + return} coro;
   $c2 call 4 = check
+  $c1 cancel $c2 cancel
 )
