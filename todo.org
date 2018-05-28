@@ -1,6 +1,7 @@
 * add coro
 ** finish iter
 *** add iter test
+* convert task to use cx_cont
 * switch cx_type methods to take raw values
 ** replace cx_box with cx_type & void *
 ** add get/set methods
@@ -15,7 +16,6 @@
 ** add tuple lib with get/put
 ** parse [] literals as tuples?
 * add Concurrency/Tasks/Coros to readme
-* convert task to use cx_cont
 * --- cxgui
 ** move start-script calls to window show event
 *** add on-show fn
