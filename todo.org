@@ -1,12 +1,10 @@
 * add coro
-** add lua coro bench
-*** add coro alloc
 ** finish iter
 *** add iter test
 * switch cx_type methods to take raw values
 ** replace cx_box with cx_type & void *
 ** add get/set methods
-* add type specific alloc
+* add type specific allocs
 ** cx_type.alloc
 *** add cx_type.size() method
 *** use instead of cx allocs
