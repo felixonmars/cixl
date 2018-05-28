@@ -1,8 +1,8 @@
-* add coro
-** finish iter
-*** add iter test
+* try replacing on_return with busy wait on state
+** split CX_RUN into CX_SUSPEND/CX_RESUME
+* finish coro iter
+** add test+readme
 * convert task to use cx_cont
-* add Concurrency/Tasks/Coros to readme
 * --- cxgui
 ** move start-script calls to window show event
 *** add on-show fn

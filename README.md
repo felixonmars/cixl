@@ -23,7 +23,7 @@ $ sudo make install
 $ sudo ldconfig /usr/local/lib
 $ rlwrap cixl
 
-Cixl v0.9.7, 18571/29582 bmips
+Cixl v0.9.8, 18044/21268 bmips
 
 Press Return twice to evaluate.
 
@@ -217,41 +217,41 @@ All types and functions belong to a library, ```lib``` may be used to find out w
 ### Types
 Cixl is statically and strongly typed; but since it's approach to typing is gradual, it allows you to be exactly as precise as you feel like. All types have capitalized names, the following are defined out of the box:
 
-| Type      | Parents     | Lib         |
-| --------- | ----------- |-------------|
-| A         | Opt         | cx/abc      |
-| Bin       | A           | cx/bin      |
-| Buf       | A           | cx/io/buf   |
-| Bool      | A           | cx/abc      |
-| Cmp       | A           | cx/abc      |
-| File      | Cmp         | cx/io       |  
-| Fimp      | Seq         | cx/abc      |
-| Float     | Num         | cx/abc      |
-| Func      | Seq         | cx/abc      |
-| Int       | Num Seq     | cx/abc      |
-| Iter      | Seq         | cx/abc      |
-| Lambda    | Seq         | cx/abc      |
-| Nil       | Opt         | cx/abc      |
-| Num       | Cmp         | cx/abc      |
-| Opt       |             | cx/abc      |
-| Pair      | Cmp         | cx/pair     |
-| Poll      | A           | cx/io/poll  |
-| Proc      | Cmp         | cx/proc     |
-| Rec       | Cmp         | cx/rec      |
-| Ref       | A           | cx/ref      |
-| RFile     | File        | cx/io       |
-| RGB       | A           | cx/gfx      |
-| RWFile    | RFile WFile | cx/io       |
-| Seq       | A           | cx/abc      |
-| Stack     | Cmp Seq     | cx/abc      |
-| Str       | Cmp Seq     | cx/abc      |
-| Sym       | A           | cx/abc      |  
-| Table     | Seq         | cx/table    |
-| TCPClient | RWFile      | cx/net      |
-| TCPServer | RFile       | cx/net      |
-| Time      | Cmp         | cx/time     |
-| Type      | A           | cx/abc      |
-| WFile     | File        | cx/io       |
+| Type       | Parents     | Lib         |
+| ---------- | ----------- |-------------|
+| A          | Opt         | cx/abc      |
+| Bin        | A           | cx/bin      |
+| Buf        | A           | cx/io/buf   |
+| Bool       | A           | cx/abc      |
+| Cmp        | A           | cx/abc      |
+| File       | Cmp         | cx/io       |  
+| Fimp       | Seq         | cx/abc      |
+| Float      | Num         | cx/abc      |
+| Func       | Seq         | cx/abc      |
+| Int        | Num Seq     | cx/abc      |
+| Iter<A>    | Seq         | cx/abc      |
+| Lambda     | Seq         | cx/abc      |
+| Nil        | Opt         | cx/abc      |
+| Num        | Cmp         | cx/abc      |
+| Opt        |             | cx/abc      |
+| Pair<A A>  | Cmp         | cx/pair     |
+| Poll       | A           | cx/io/poll  |
+| Proc       | Cmp         | cx/proc     |
+| Rec        | Cmp         | cx/rec      |
+| Ref        | A           | cx/ref      |
+| RFile      | File        | cx/io       |
+| RGB        | A           | cx/gfx      |
+| RWFile     | RFile WFile | cx/io       |
+| Seq<A>     | A           | cx/abc      |
+| Stack<A>   | Cmp Seq     | cx/abc      |
+| Str        | Cmp Seq     | cx/abc      |
+| Sym        | A           | cx/abc      |  
+| Table<A A> | Seq         | cx/table    |
+| TCPClient  | RWFile      | cx/net      |
+| TCPServer  | RFile       | cx/net      |
+| Time       | Cmp         | cx/time     |
+| Type<A>    | A           | cx/abc      |
+| WFile      | File        | cx/io       |
 
 ```
    | 42 type
@@ -1239,6 +1239,50 @@ Records provide full deep equality by default, but ```=``` may be implemented to
    | $bar $baz =
 
 [#t]
+```
+
+### Concurrency
+Besides IO polling with callbacks, Cixl supports two more flavors of cooperative concurrency; tasks and coroutines.
+
+#### Tasks
+Tasks allow running multiple cooperative threads of execution in parallel.
+
+```
+  let: s Sched new;
+  let: out [];
+
+  $s {
+    $out 1 push
+    resched
+    $out 2 push
+  } push
+
+  $s {
+    $out 3 push
+  } push
+
+  $s run
+  $out @, join say
+
+1, 3, 2
+```
+
+#### Coroutines
+Coroutines allow suspending, resuming and restarting the execution of a call.
+
+```
+   let: c {1 suspend 3 suspend 5} coro;
+   | $c call $c call $c call
+
+[1 3 5]
+
+   | $c call
+
+Error in row 1, col 3:
+Coro is done
+
+   | $c reset $c call $c call
+[1 3]
 ```
 
 ### Binaries
