@@ -50,7 +50,7 @@ struct cx_coro *cx_coro_deinit(struct cx_coro *c) {
     }
   }
   
-  if (c->state != CX_CORO_FREE) {
+  if (c->state != CX_CORO_CANCEL) {
     cx_box_deinit(&c->action);
     cx_cont_deinit(&c->cont);
   }
@@ -89,6 +89,7 @@ static void suspend_stack(struct cx_scope *src) {
 
 static void *on_start(void *data) {
   struct cx_coro *c = data;
+  c->state = CX_CORO_RESUME;
   cx_call(&c->action, cx_scope(c->cx, 0));
   c->state = CX_CORO_DONE;
   struct cx_scope *src = cx_scope(c->cx, 0);
@@ -109,7 +110,6 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
   
   switch (c->state) {
   case CX_CORO_NEW: {
-    c->state = CX_CORO_RUN;
     cx_cont_reset(&c->cont);
     cx->coro = c;
 
@@ -131,7 +131,7 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
     
     break;
   }
-  case CX_CORO_RUN: {
+  case CX_CORO_SUSPEND: {
     cx_cont_resume(&c->cont);
     cx->coro = c;
     
@@ -147,10 +147,13 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
     
     break;
   }
+  case CX_CORO_RESUME:
+    cx_error(cx, cx->row, cx->col, "Coro isn't suspended");
+    goto exit;
   case CX_CORO_DONE:
     cx_error(cx, cx->row, cx->col, "Coro is done");
     goto exit;
-  case CX_CORO_FREE:
+  case CX_CORO_CANCEL:
     cx_error(cx, cx->row, cx->col, "Coro is cancelled");
     goto exit;
   }
@@ -182,7 +185,7 @@ bool cx_coro_reset(struct cx_coro *c) {
 }
 
 bool cx_coro_cancel(struct cx_coro *c) {
-  if (c->state == CX_CORO_FREE) { return true; }
+  if (c->state == CX_CORO_CANCEL) { return true; }
   struct cx *cx = c->cx;
   
   if (c->state != CX_CORO_NEW) {
@@ -201,7 +204,7 @@ bool cx_coro_cancel(struct cx_coro *c) {
 
   cx_box_deinit(&c->action);
   cx_cont_deinit(&c->cont);
-  c->state = CX_CORO_FREE;
+  c->state = CX_CORO_CANCEL;
   return true;
 }
 
@@ -209,7 +212,8 @@ bool cx_coro_suspend(struct cx_coro *c, struct cx_scope *scope) {
   struct cx *cx = c->cx;
   cx_cont_suspend(&c->cont);
   if (scope->stack.count) { suspend_stack(scope); }
-  
+  c->state = CX_CORO_SUSPEND;
+
   if (sem_post(&c->on_suspend) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed posting suspend: %d", errno);
     return false;
@@ -220,6 +224,7 @@ bool cx_coro_suspend(struct cx_coro *c, struct cx_scope *scope) {
     return false;
   }
 
+  c->state = CX_CORO_RESUME;
   return true;
 }
 

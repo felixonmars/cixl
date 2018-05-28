@@ -1,5 +1,4 @@
 * try replacing on_return with busy wait on state
-** split CX_RUN into CX_SUSPEND/CX_RESUME
 * finish coro iter
 ** add test+readme
 * convert task to use cx_cont
