@@ -1,4 +1,4 @@
-n = 10000
+n = 100000
 
 c = Fiber.new {(0..n).each {|i| Fiber.yield(i)}}
 

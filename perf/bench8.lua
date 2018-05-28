@@ -1,4 +1,4 @@
-n = 10000
+n = 100000
 
 function f()
   for i=1,n do

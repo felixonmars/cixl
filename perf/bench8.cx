@@ -1,6 +1,6 @@
 use: cx;
 
-define: n 10000;
+define: n 100000;
 let: c {#n &suspend for} coro;
 {#n {$c call = check} for} clock 1000000 / say
 $c cancel
