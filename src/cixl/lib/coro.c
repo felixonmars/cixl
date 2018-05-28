@@ -21,16 +21,16 @@ static bool coro_imp(struct cx_call *call) {
   return true;
 }
 
-static bool return_imp(struct cx_call *call) {
+static bool suspend_imp(struct cx_call *call) {
   struct cx_scope *s = call->scope;
   struct cx_coro *c = s->cx->coro;
 
   if (!c) {
-    cx_error(s->cx, s->cx->row, s->cx->col, "Nothing to return from");
+    cx_error(s->cx, s->cx->row, s->cx->col, "Nothing to suspend");
     return false;
   }
   
-  return cx_coro_return(c, s);
+  return cx_coro_suspend(c, s);
 }
 
 static bool reset_imp(struct cx_call *call) {
@@ -57,10 +57,10 @@ cx_lib(cx_init_coro, "cx/coro") {
 	       cx_args(cx_arg(NULL, cx->coro_type)),
 	       coro_imp);
 
-  cx_add_cfunc(lib, "return",
+  cx_add_cfunc(lib, "suspend",
 	       cx_args(),
 	       cx_args(),
-	       return_imp);
+	       suspend_imp);
 
   cx_add_cfunc(lib, "reset",
 	       cx_args(cx_arg("coro", cx->coro_type)),

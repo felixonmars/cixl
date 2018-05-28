@@ -45,7 +45,7 @@ void cx_cont_reset(struct cx_cont *c) {
   c->prev_ncalls = cx->ncalls;
 }
 
-void cx_cont_return(struct cx_cont *c) {
+void cx_cont_suspend(struct cx_cont *c) {
   struct cx *cx = c->cx;
   cx->coro = c->prev_coro;
   cx->task = c->prev_task;

@@ -2,19 +2,6 @@
 ** finish iter
 *** add iter test
 * convert task to use cx_cont
-* switch cx_type methods to take raw values
-** replace cx_box with cx_type & void *
-** add get/set methods
-* add type specific allocs
-** cx_type.alloc
-*** add cx_type.size() method
-*** use instead of cx allocs
-* add tuples
-** alloc whole block of memory
-** use cx_box as default field type
-** add Tuple<> type
-** add tuple lib with get/put
-** parse [] literals as tuples?
 * add Concurrency/Tasks/Coros to readme
 * --- cxgui
 ** move start-script calls to window show event
@@ -46,6 +33,10 @@
 ** target & cache
 ** add memo lib with put/deleate/clear fns
 * add cont
+* add type specific allocs
+** cx_type.alloc
+*** add cx_type.size() method
+*** use instead of cx allocs
 * replace cx_fimp.init with enum cx_fimp_type
 ** CX_FHOST_C, CX_FHOST_CX, CX_FGUEST
 * remove Rec =/?/print overloads

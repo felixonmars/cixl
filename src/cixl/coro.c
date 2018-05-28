@@ -20,11 +20,11 @@ struct cx_coro *cx_coro_new(struct cx *cx, struct cx_box *action) {
   c->nrefs = 1;
 
   if (sem_init(&c->on_call, false, 0) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed initializing run: %d", errno);
+    cx_error(cx, cx->row, cx->col, "Failed initializing call: %d", errno);
   }
 
-  if (sem_init(&c->on_return, false, 0) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed initializing resume: %d", errno);
+  if (sem_init(&c->on_suspend, false, 0) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed initializing suspend: %d", errno);
   }
 
   cx_cont_init(&c->cont, cx);
@@ -55,12 +55,12 @@ struct cx_coro *cx_coro_deinit(struct cx_coro *c) {
     cx_cont_deinit(&c->cont);
   }
 
-  if (sem_destroy(&c->on_return) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed destroying return: %d", errno);
+  if (sem_destroy(&c->on_suspend) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed destroying suspend: %d", errno);
   }
 
   if (sem_destroy(&c->on_call) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed destroying run: %d", errno);
+    cx_error(cx, cx->row, cx->col, "Failed destroying call: %d", errno);
   }
   
   return c;
@@ -72,7 +72,7 @@ void cx_coro_deref(struct cx_coro *c) {
   if (!c->nrefs) { free(cx_coro_deinit(c)); }
 }
 
-static void return_stack(struct cx_scope *src) {
+static void suspend_stack(struct cx_scope *src) {
   struct cx_scope *dst = cx_scope(src->cx, 0);
   
   if (dst != src) {
@@ -93,10 +93,10 @@ static void *on_start(void *data) {
   c->state = CX_CORO_DONE;
   struct cx_scope *src = cx_scope(c->cx, 0);
   cx_cont_finish(&c->cont);
-  if (src->stack.count) { return_stack(src); }
+  if (src->stack.count) { suspend_stack(src); }
   
-  if (sem_post(&c->on_return) != 0) {
-    cx_error(c->cx, c->cx->row, c->cx->col, "Failed posting return: %d", errno);
+  if (sem_post(&c->on_suspend) != 0) {
+    cx_error(c->cx, c->cx->row, c->cx->col, "Failed posting suspend: %d", errno);
     return NULL;
   }
   
@@ -124,8 +124,8 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
       goto exit;
     }
 
-    if (sem_wait(&c->on_return) != 0) {
-      cx_error(cx, cx->row, cx->col, "Failed waiting on return: %d", errno);
+    if (sem_wait(&c->on_suspend) != 0) {
+      cx_error(cx, cx->row, cx->col, "Failed waiting on suspend: %d", errno);
       goto exit;
     }
     
@@ -140,8 +140,8 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
       goto exit;
     }
 
-    if (sem_wait(&c->on_return) != 0) {
-      cx_error(cx, cx->row, cx->col, "Failed waiting on return: %d", errno);
+    if (sem_wait(&c->on_suspend) != 0) {
+      cx_error(cx, cx->row, cx->col, "Failed waiting on suspend: %d", errno);
       goto exit;
     }
     
@@ -205,13 +205,13 @@ bool cx_coro_cancel(struct cx_coro *c) {
   return true;
 }
 
-bool cx_coro_return(struct cx_coro *c, struct cx_scope *scope) {
+bool cx_coro_suspend(struct cx_coro *c, struct cx_scope *scope) {
   struct cx *cx = c->cx;
-  cx_cont_return(&c->cont);
-  if (scope->stack.count) { return_stack(scope); }
+  cx_cont_suspend(&c->cont);
+  if (scope->stack.count) { suspend_stack(scope); }
   
-  if (sem_post(&c->on_return) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed posting return: %d", errno);
+  if (sem_post(&c->on_suspend) != 0) {
+    cx_error(cx, cx->row, cx->col, "Failed posting suspend: %d", errno);
     return false;
   }
 

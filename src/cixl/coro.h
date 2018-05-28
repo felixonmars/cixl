@@ -20,7 +20,7 @@ struct cx_coro {
   struct cx_cont cont;
   struct cx_box action;
   pthread_t thread;
-  sem_t on_call, on_return;
+  sem_t on_call, on_suspend;
   enum cx_coro_state state;
   struct cx_coro *prev_coro;
   unsigned int nrefs;
@@ -36,7 +36,7 @@ struct cx_coro *cx_coro_deinit(struct cx_coro *c);
 bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope);
 bool cx_coro_reset(struct cx_coro *c);
 bool cx_coro_cancel(struct cx_coro *c);
-bool cx_coro_return(struct cx_coro *c, struct cx_scope *scope);
+bool cx_coro_suspend(struct cx_coro *c, struct cx_scope *scope);
 
 struct cx_type *cx_init_coro_type(struct cx_lib *lib);
 

@@ -10,7 +10,7 @@
 #include "cixl/set.h"
 #include "cixl/type.h"
 
-#define CX_VERSION "0.9.7"
+#define CX_VERSION "0.9.8"
 #define CX_SLAB_SIZE 32				  
 #define CX_MAX_CALLS 64
 
