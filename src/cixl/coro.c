@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -21,10 +22,6 @@ struct cx_coro *cx_coro_new(struct cx *cx, struct cx_box *action) {
 
   if (sem_init(&c->on_call, false, 0) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed initializing call: %d", errno);
-  }
-
-  if (sem_init(&c->on_suspend, false, 0) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed initializing suspend: %d", errno);
   }
 
   cx_cont_init(&c->cont, cx);
@@ -53,10 +50,6 @@ struct cx_coro *cx_coro_deinit(struct cx_coro *c) {
   if (c->state != CX_CORO_CANCEL) {
     cx_box_deinit(&c->action);
     cx_cont_deinit(&c->cont);
-  }
-
-  if (sem_destroy(&c->on_suspend) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed destroying suspend: %d", errno);
   }
 
   if (sem_destroy(&c->on_call) != 0) {
@@ -89,18 +82,11 @@ static void suspend_stack(struct cx_scope *src) {
 
 static void *on_start(void *data) {
   struct cx_coro *c = data;
-  c->state = CX_CORO_RESUME;
   cx_call(&c->action, cx_scope(c->cx, 0));
-  c->state = CX_CORO_DONE;
+  atomic_store(&c->state, CX_CORO_DONE);
   struct cx_scope *src = cx_scope(c->cx, 0);
   cx_cont_finish(&c->cont);
   if (src->stack.count) { suspend_stack(src); }
-  
-  if (sem_post(&c->on_suspend) != 0) {
-    cx_error(c->cx, c->cx->row, c->cx->col, "Failed posting suspend: %d", errno);
-    return NULL;
-  }
-  
   return NULL;
 }
 
@@ -112,6 +98,7 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
   case CX_CORO_NEW: {
     cx_cont_reset(&c->cont);
     cx->coro = c;
+    c->state = CX_CORO_RESUME;
 
     pthread_attr_t a;
     pthread_attr_init(&a);
@@ -124,27 +111,20 @@ bool cx_coro_call(struct cx_coro *c, struct cx_scope *scope) {
       goto exit;
     }
 
-    if (sem_wait(&c->on_suspend) != 0) {
-      cx_error(cx, cx->row, cx->col, "Failed waiting on suspend: %d", errno);
-      goto exit;
-    }
-    
+    while (atomic_load(&c->state) == CX_CORO_RESUME) { sched_yield(); }
     break;
   }
   case CX_CORO_SUSPEND: {
     cx_cont_resume(&c->cont);
     cx->coro = c;
+    c->state = CX_CORO_RESUME;
     
     if (sem_post(&c->on_call) != 0) {
       cx_error(cx, cx->row, cx->col, "Failed posting run: %d", errno);
       goto exit;
     }
 
-    if (sem_wait(&c->on_suspend) != 0) {
-      cx_error(cx, cx->row, cx->col, "Failed waiting on suspend: %d", errno);
-      goto exit;
-    }
-    
+    while (atomic_load(&c->state) == CX_CORO_RESUME) { sched_yield(); }
     break;
   }
   case CX_CORO_RESUME:
@@ -212,19 +192,13 @@ bool cx_coro_suspend(struct cx_coro *c, struct cx_scope *scope) {
   struct cx *cx = c->cx;
   cx_cont_suspend(&c->cont);
   if (scope->stack.count) { suspend_stack(scope); }
-  c->state = CX_CORO_SUSPEND;
-
-  if (sem_post(&c->on_suspend) != 0) {
-    cx_error(cx, cx->row, cx->col, "Failed posting suspend: %d", errno);
-    return false;
-  }
+  atomic_store(&c->state, CX_CORO_SUSPEND);
 
   if (sem_wait(&c->on_call) != 0) {
     cx_error(cx, cx->row, cx->col, "Failed waiting on run: %d", errno);
     return false;
   }
 
-  c->state = CX_CORO_RESUME;
   return true;
 }
 

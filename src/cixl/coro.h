@@ -23,7 +23,7 @@ struct cx_coro {
   struct cx_cont cont;
   struct cx_box action;
   pthread_t thread;
-  sem_t on_call, on_suspend;
+  sem_t on_call;
   enum cx_coro_state state;
   struct cx_coro *prev_coro;
   unsigned int nrefs;
