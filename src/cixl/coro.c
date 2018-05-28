@@ -37,17 +37,17 @@ struct cx_coro *cx_coro_ref(struct cx_coro *c) {
 struct cx_coro *cx_coro_deinit(struct cx_coro *c) {
   struct cx *cx = c->cx;
 
-  if (c->state != CX_CORO_NEW) {
-    if (c->state != CX_CORO_DONE && pthread_join(c->thread, NULL) != 0) {
-      cx_error(cx, cx->row, cx->col, "Failed cancelling thread: %d", errno);
+  if (c->state != CX_CORO_CANCEL) {
+    if (c->state != CX_CORO_NEW) {
+      if (c->state != CX_CORO_DONE && pthread_cancel(c->thread) != 0) {
+	cx_error(cx, cx->row, cx->col, "Failed cancelling thread: %d", errno);
+      }
+      
+      if (pthread_join(c->thread, NULL) != 0) {
+	cx_error(cx, cx->row, cx->col, "Failed joining thread: %d", errno);
+      }
     }
     
-    if (pthread_join(c->thread, NULL) != 0) {
-      cx_error(cx, cx->row, cx->col, "Failed joining thread: %d", errno);
-    }
-  }
-  
-  if (c->state != CX_CORO_CANCEL) {
     cx_box_deinit(&c->action);
     cx_cont_deinit(&c->cont);
   }
@@ -83,10 +83,10 @@ static void suspend_stack(struct cx_scope *src) {
 static void *on_start(void *data) {
   struct cx_coro *c = data;
   cx_call(&c->action, cx_scope(c->cx, 0));
-  atomic_store(&c->state, CX_CORO_DONE);
   struct cx_scope *src = cx_scope(c->cx, 0);
   cx_cont_finish(&c->cont);
   if (src->stack.count) { suspend_stack(src); }
+  atomic_store(&c->state, CX_CORO_DONE);
   return NULL;
 }
 
@@ -167,7 +167,7 @@ bool cx_coro_reset(struct cx_coro *c) {
 bool cx_coro_cancel(struct cx_coro *c) {
   if (c->state == CX_CORO_CANCEL) { return true; }
   struct cx *cx = c->cx;
-  
+
   if (c->state != CX_CORO_NEW) {
     if (c->state != CX_CORO_DONE) {
       if (pthread_cancel(c->thread) != 0) {
@@ -216,7 +216,11 @@ static bool coro_next(struct cx_iter *iter,
     iter->done = true;
     return false;
   }
-  
+
+  if (!cx_coro_call(it->src, scope)) { return false; }
+  struct cx_box *v = cx_pop(scope, false);
+  if (!v) { return false; }
+  cx_copy(out, v);
   return true;
 }
 

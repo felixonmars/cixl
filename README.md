@@ -1285,6 +1285,15 @@ Coro is done
 [1 3]
 ```
 
+Coroutines may alternatively be iterated.
+
+```
+  let: c {1 suspend 3 suspend 5} coro;
+  [$c {2 *} for]
+
+[2 6 10]
+```
+
 ### Binaries
 A ```Bin``` represents a block of compiled code. The compiler may be invoked from within the language through the ```compile``` function. Binaries may be passed around and called, which simply executes the compiled operations in the current scope.
 
