@@ -8,14 +8,9 @@
 *** restart coro
 ** finish iter
 * add lua coro bench
-* convert task to use cx_cont
 * add coro alloc
 * add Concurrency/Tasks/Coros to readme
-* add memo
-** struct cx_memo/cx_memo_item
-** target & cache
-** add memo lib with put/deleate/clear fns
-* add cont
+* convert task to use cx_cont
 * --- cxgui
 ** move start-script calls to window show event
 *** add on-show fn
@@ -41,6 +36,11 @@
 * resolve rec/type-id parent types using type args
 * switch term fn arg order to out first
 * ---
+* add memo
+** struct cx_memo/cx_memo_item
+** target & cache
+** add memo lib with put/deleate/clear fns
+* add cont
 * replace cx_fimp.init with enum cx_fimp_type
 ** CX_FHOST_C, CX_FHOST_CX, CX_FGUEST
 * remove Rec =/?/print overloads
