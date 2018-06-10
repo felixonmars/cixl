@@ -23,7 +23,7 @@ main(!IO) :-
     benchmark_det_io(test, unit, _, !IO, N, Time),
     format("%.3fms\n", [f((float(Time) / float(N)))], !IO).
 
-% Create two threads that yeild 10,000 times each.  There is no
+% Create two threads that yield 10,000 times each.  There is no
 % synchronisation between any of the threads.  Test this using
 % MERCURY_OPTIONS=-P1 to ensure both threads take in turns using the CPU and
 % you actually test Mercury's context switching.
